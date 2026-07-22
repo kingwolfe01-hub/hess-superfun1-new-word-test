@@ -151,34 +151,27 @@
         }
 
         .word-img {
-            width: 160px;
-            height: 160px;
+            width: 170px;
+            height: 170px;
             object-fit: cover;
             border-radius: 20px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
             box-shadow: 0 8px 16px rgba(0,0,0,0.08);
             background-color: #f8fafc;
         }
 
         .word-text {
-            font-size: 2.2rem;
+            font-size: 2.4rem;
             font-weight: 800;
             color: #0f172a;
             letter-spacing: -0.5px;
         }
 
-        .phonics-text {
-            font-size: 1.1rem;
-            color: #64748b;
-            margin-top: 4px;
-            font-weight: 500;
-        }
-
         .meaning-text {
-            font-size: 1.3rem;
+            font-size: 1.4rem;
             color: #4f46e5;
             font-weight: 700;
-            margin-top: 6px;
+            margin-top: 8px;
         }
 
         .btn-group {
@@ -278,6 +271,39 @@
         .correct { color: #047857; background-color: #d1fae5; }
         .incorrect { color: #b91c1c; background-color: #fee2e2; }
 
+        /* 🌊 動態聲波紋樣式 */
+        .wave-container {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            height: 35px;
+            margin-top: 8px;
+        }
+
+        .wave-container.active {
+            display: flex;
+        }
+
+        .wave-bar {
+            width: 6px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 3px;
+            animation: waveAnim 0.8s infinite ease-in-out alternate;
+        }
+
+        .wave-bar:nth-child(1) { animation-delay: 0.0s; }
+        .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.45s; }
+        .wave-bar:nth-child(5) { animation-delay: 0.6s; }
+
+        @keyframes waveAnim {
+            0% { height: 8px; background: #10b981; }
+            100% { height: 32px; background: #059669; }
+        }
+
         .progress-badge {
             background: #e0e7ff;
             color: #4338ca;
@@ -311,9 +337,8 @@
     <div class="content-area">
         <div id="flashcard-mode" class="mode-section active">
             <div class="card-box">
-                <img id="fc-img" class="word-img" src="" alt="單字圖片" onerror="this.src='https://via.placeholder.com/160?text=No+Image'">
+                <img id="fc-img" class="word-img" src="" alt="單字圖片" onerror="this.src='https://via.placeholder.com/170?text=No+Image'">
                 <div class="word-text" id="fc-word">-</div>
-                <div class="phonics-text" id="fc-phonics">-</div>
                 <div class="meaning-text" id="fc-meaning">-</div>
             </div>
             
@@ -355,15 +380,21 @@
                 <div>
                     <span class="progress-badge" id="spk-progress">題目 1 / 1</span>
                     <div class="card-box" style="margin-top: 10px;">
-                        <img id="sp-img" class="word-img" src="" alt="單字圖片" onerror="this.src='https://via.placeholder.com/160?text=No+Image'">
+                        <img id="sp-img" class="word-img" src="" alt="單字圖片" onerror="this.src='https://via.placeholder.com/170?text=No+Image'">
                         <div class="word-text" id="sp-word">-</div>
-                        <div class="phonics-text" id="sp-phonics">-</div>
                         <div class="meaning-text" id="sp-meaning">-</div>
                     </div>
                 </div>
 
                 <div>
                     <button class="btn btn-success" id="mic-btn" onclick="startSpeechRecognition()">🎙️ 按下開始唸單字</button>
+                    <div class="wave-container" id="wave-box">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
                     <div id="speaking-feedback" class="feedback-box"></div>
                 </div>
             </div>
@@ -384,87 +415,87 @@
     // === Super Fun 1 基礎單元資料庫 ===
     const rawUnits = {
         "🔢 Numbers 數字 1-10": [
-            { word: "one", phonics: "[ wʌn ]", meaning: "一", image: "assets/images/b1/one.png", audio: "assets/audio/b1/one.mp3" },
-            { word: "two", phonics: "[ tuː ]", meaning: "二", image: "assets/images/b1/two.png", audio: "assets/audio/b1/two.mp3" },
-            { word: "three", phonics: "[ θriː ]", meaning: "三", image: "assets/images/b1/three.png", audio: "assets/audio/b1/three.mp3" },
-            { word: "four", phonics: "[ fɔːr ]", meaning: "四", image: "assets/images/b1/four.png", audio: "assets/audio/b1/four.mp3" },
-            { word: "five", phonics: "[ faɪv ]", meaning: "五", image: "assets/images/b1/five.png", audio: "assets/audio/b1/five.mp3" },
-            { word: "six", phonics: "[ sɪks ]", meaning: "六", image: "assets/images/b1/six.png", audio: "assets/audio/b1/six.mp3" },
-            { word: "seven", phonics: "[ ˈsevn ]", meaning: "七", image: "assets/images/b1/seven.png", audio: "assets/audio/b1/seven.mp3" },
-            { word: "eight", phonics: "[ eɪt ]", meaning: "八", image: "assets/images/b1/eight.png", audio: "assets/audio/b1/eight.mp3" },
-            { word: "nine", phonics: "[ naɪn ]", meaning: "九", image: "assets/images/b1/nine.png", audio: "assets/audio/b1/nine.mp3" },
-            { word: "ten", phonics: "[ ten ]", meaning: "十", image: "assets/images/b1/ten.png", audio: "assets/audio/b1/ten.mp3" }
+            { word: "one", meaning: "一", image: "assets/images/b1/one.png", audio: "assets/audio/b1/one.mp3" },
+            { word: "two", meaning: "二", image: "assets/images/b1/two.png", audio: "assets/audio/b1/two.mp3" },
+            { word: "three", meaning: "三", image: "assets/images/b1/three.png", audio: "assets/audio/b1/three.mp3" },
+            { word: "four", meaning: "四", image: "assets/images/b1/four.png", audio: "assets/audio/b1/four.mp3" },
+            { word: "five", meaning: "五", image: "assets/images/b1/five.png", audio: "assets/audio/b1/five.mp3" },
+            { word: "six", meaning: "六", image: "assets/images/b1/six.png", audio: "assets/audio/b1/six.mp3" },
+            { word: "seven", meaning: "七", image: "assets/images/b1/seven.png", audio: "assets/audio/b1/seven.mp3" },
+            { word: "eight", meaning: "八", image: "assets/images/b1/eight.png", audio: "assets/audio/b1/eight.mp3" },
+            { word: "nine", meaning: "九", image: "assets/images/b1/nine.png", audio: "assets/audio/b1/nine.mp3" },
+            { word: "ten", meaning: "十", image: "assets/images/b1/ten.png", audio: "assets/audio/b1/ten.mp3" }
         ],
         "Phonics 1 (A-F)": [
-            { word: "ant", phonics: "[ ænt ]", meaning: "螞蟻", image: "assets/images/b1/ant.png", audio: "assets/audio/b1/ant.mp3" },
-            { word: "bag", phonics: "[ bæɡ ]", meaning: "袋子", image: "assets/images/b1/bag.png", audio: "assets/audio/b1/bag.mp3" },
-            { word: "cat", phonics: "[ kæt ]", meaning: "貓咪", image: "assets/images/b1/cat.png", audio: "assets/audio/b1/cat.mp3" },
-            { word: "dog", phonics: "[ dɔːɡ ]", meaning: "狗", image: "assets/images/b1/dog.png", audio: "assets/audio/b1/dog.mp3" },
-            { word: "egg", phonics: "[ eɡ ]", meaning: "蛋", image: "assets/images/b1/egg.png", audio: "assets/audio/b1/egg.mp3" },
-            { word: "fish", phonics: "[ fɪʃ ]", meaning: "魚", image: "assets/images/b1/fish.png", audio: "assets/audio/b1/fish.mp3" }
+            { word: "ant", meaning: "螞蟻", image: "assets/images/b1/ant.png", audio: "assets/audio/b1/ant.mp3" },
+            { word: "bag", meaning: "袋子", image: "assets/images/b1/bag.png", audio: "assets/audio/b1/bag.mp3" },
+            { word: "cat", meaning: "貓咪", image: "assets/images/b1/cat.png", audio: "assets/audio/b1/cat.mp3" },
+            { word: "dog", meaning: "狗", image: "assets/images/b1/dog.png", audio: "assets/audio/b1/dog.mp3" },
+            { word: "egg", meaning: "蛋", image: "assets/images/b1/egg.png", audio: "assets/audio/b1/egg.mp3" },
+            { word: "fish", meaning: "魚", image: "assets/images/b1/fish.png", audio: "assets/audio/b1/fish.mp3" }
         ],
         "Phonics 2 (G-M)": [
-            { word: "girl", phonics: "[ ɡɜːrl ]", meaning: "女孩", image: "assets/images/b1/girl.png", audio: "assets/audio/b1/girl.mp3" },
-            { word: "hat", phonics: "[ hæt ]", meaning: "帽子", image: "assets/images/b1/hat.png", audio: "assets/audio/b1/hat.mp3" },
-            { word: "insect", phonics: "[ ˈɪnsekt ]", meaning: "昆蟲", image: "assets/images/b1/insect.png", audio: "assets/audio/b1/insect.mp3" },
-            { word: "jet", phonics: "[ dʒet ]", meaning: "噴射機", image: "assets/images/b1/jet.png", audio: "assets/audio/b1/jet.mp3" },
-            { word: "kite", phonics: "[ kaɪt ]", meaning: "風箏", image: "assets/images/b1/kite.png", audio: "assets/audio/b1/kite.mp3" },
-            { word: "lion", phonics: "[ ˈlaɪən ]", meaning: "獅子", image: "assets/images/b1/lion.png", audio: "assets/audio/b1/lion.mp3" },
-            { word: "monkey", phonics: "[ ˈmʌŋki ]", meaning: "猴子", image: "assets/images/b1/monkey.png", audio: "assets/audio/b1/monkey.mp3" }
+            { word: "girl", meaning: "女孩", image: "assets/images/b1/girl.png", audio: "assets/audio/b1/girl.mp3" },
+            { word: "hat", meaning: "帽子", image: "assets/images/b1/hat.png", audio: "assets/audio/b1/hat.mp3" },
+            { word: "insect", meaning: "昆蟲", image: "assets/images/b1/insect.png", audio: "assets/audio/b1/insect.mp3" },
+            { word: "jet", meaning: "噴射機", image: "assets/images/b1/jet.png", audio: "assets/audio/b1/jet.mp3" },
+            { word: "kite", meaning: "風箏", image: "assets/images/b1/kite.png", audio: "assets/audio/b1/kite.mp3" },
+            { word: "lion", meaning: "獅子", image: "assets/images/b1/lion.png", audio: "assets/audio/b1/lion.mp3" },
+            { word: "monkey", meaning: "猴子", image: "assets/images/b1/monkey.png", audio: "assets/audio/b1/monkey.mp3" }
         ],
         "Phonics 3 (N-R, Six)": [
-            { word: "nose", phonics: "[ noʊz ]", meaning: "鼻子", image: "assets/images/b1/nose.png", audio: "assets/audio/b1/nose.mp3" },
-            { word: "ox", phonics: "[ ɑːks ]", meaning: "公牛", image: "assets/images/b1/ox.png", audio: "assets/audio/b1/ox.mp3" },
-            { word: "pig", phonics: "[ pɪɡ ]", meaning: "豬", image: "assets/images/b1/pig.png", audio: "assets/audio/b1/pig.mp3" },
-            { word: "queen", phonics: "[ kwiːn ]", meaning: "女王", image: "assets/images/b1/queen.png", audio: "assets/audio/b1/queen.mp3" },
-            { word: "rabbit", phonics: "[ ˈræbɪt ]", meaning: "兔子", image: "assets/images/b1/rabbit.png", audio: "assets/audio/b1/rabbit.mp3" },
-            { word: "six", phonics: "[ sɪks ]", meaning: "六", image: "assets/images/b1/six.png", audio: "assets/audio/b1/six.mp3" }
+            { word: "nose", meaning: "鼻子", image: "assets/images/b1/nose.png", audio: "assets/audio/b1/nose.mp3" },
+            { word: "ox", meaning: "公牛", image: "assets/images/b1/ox.png", audio: "assets/audio/b1/ox.mp3" },
+            { word: "pig", meaning: "豬", image: "assets/images/b1/pig.png", audio: "assets/audio/b1/pig.mp3" },
+            { word: "queen", meaning: "女王", image: "assets/images/b1/queen.png", audio: "assets/audio/b1/queen.mp3" },
+            { word: "rabbit", meaning: "兔子", image: "assets/images/b1/rabbit.png", audio: "assets/audio/b1/rabbit.mp3" },
+            { word: "six", meaning: "六", image: "assets/images/b1/six.png", audio: "assets/audio/b1/six.mp3" }
         ],
         "Phonics 4 (T-Z)": [
-            { word: "ten", phonics: "[ ten ]", meaning: "十", image: "assets/images/b1/ten.png", audio: "assets/audio/b1/ten.mp3" },
-            { word: "up", phonics: "[ ʌp ]", meaning: "向上", image: "assets/images/b1/up.png", audio: "assets/audio/b1/up.mp3" },
-            { word: "vest", phonics: "[ vest ]", meaning: "背心", image: "assets/images/b1/vest.png", audio: "assets/audio/b1/vest.mp3" },
-            { word: "window", phonics: "[ ˈwɪndoʊ ]", meaning: "窗戶", image: "assets/images/b1/window.png", audio: "assets/audio/b1/window.mp3" },
-            { word: "fox", phonics: "[ fɑːks ]", meaning: "狐狸", image: "assets/images/b1/fox.png", audio: "assets/audio/b1/fox.mp3" },
-            { word: "yo-yo", phonics: "[ ˈjoʊ joʊ ]", meaning: "溜溜球", image: "assets/images/b1/yo-yo.png", audio: "assets/audio/b1/yo-yo.mp3" },
-            { word: "zebra", phonics: "[ ˈziːbrə ]", meaning: "斑馬", image: "assets/images/b1/zebra.png", audio: "assets/audio/b1/zebra.mp3" }
+            { word: "ten", meaning: "十", image: "assets/images/b1/ten.png", audio: "assets/audio/b1/ten.mp3" },
+            { word: "up", meaning: "向上", image: "assets/images/b1/up.png", audio: "assets/audio/b1/up.mp3" },
+            { word: "vest", meaning: "背心", image: "assets/images/b1/vest.png", audio: "assets/audio/b1/vest.mp3" },
+            { word: "window", meaning: "窗戶", image: "assets/images/b1/window.png", audio: "assets/audio/b1/window.mp3" },
+            { word: "fox", meaning: "狐狸", image: "assets/images/b1/fox.png", audio: "assets/audio/b1/fox.mp3" },
+            { word: "yo-yo", meaning: "溜溜球", image: "assets/images/b1/yo-yo.png", audio: "assets/audio/b1/yo-yo.mp3" },
+            { word: "zebra", meaning: "斑馬", image: "assets/images/b1/zebra.png", audio: "assets/audio/b1/zebra.mp3" }
         ],
         "Topic 1 - Lesson 1: Name & Friends": [
-            { word: "what", phonics: "[ wɑːt ]", meaning: "什麼", image: "assets/images/b1/what.png", audio: "assets/audio/b1/what.mp3" },
-            { word: "your", phonics: "[ jʊr ]", meaning: "你的", image: "assets/images/b1/your.png", audio: "assets/audio/b1/your.mp3" },
-            { word: "name", phonics: "[ neɪm ]", meaning: "名字", image: "assets/images/b1/name.png", audio: "assets/audio/b1/name.mp3" },
-            { word: "my", phonics: "[ maɪ ]", meaning: "我的", image: "assets/images/b1/my.png", audio: "assets/audio/b1/my.mp3" },
-            { word: "Ken", phonics: "[ ken ]", meaning: "Ken (肯)", image: "assets/images/b1/ken.png", audio: "assets/audio/b1/ken.mp3" },
-            { word: "Emma", phonics: "[ ˈemə ]", meaning: "Emma (艾瑪)", image: "assets/images/b1/emma.png", audio: "assets/audio/b1/emma.mp3" },
-            { word: "Mike", phonics: "[ maɪk ]", meaning: "Mike (麥克)", image: "assets/images/b1/mike.png", audio: "assets/audio/b1/mike.mp3" },
-            { word: "Wendy", phonics: "[ ˈwendi ]", meaning: "Wendy (溫蒂)", image: "assets/images/b1/wendy.png", audio: "assets/audio/b1/wendy.mp3" },
-            { word: "Alan", phonics: "[ ˈælən ]", meaning: "Alan (艾倫)", image: "assets/images/b1/alan.png", audio: "assets/audio/b1/alan.mp3" }
+            { word: "what", meaning: "什麼", image: "assets/images/b1/what.png", audio: "assets/audio/b1/what.mp3" },
+            { word: "your", meaning: "你的", image: "assets/images/b1/your.png", audio: "assets/audio/b1/your.mp3" },
+            { word: "name", meaning: "名字", image: "assets/images/b1/name.png", audio: "assets/audio/b1/name.mp3" },
+            { word: "my", meaning: "我的", image: "assets/images/b1/my.png", audio: "assets/audio/b1/my.mp3" },
+            { word: "Ken", meaning: "Ken (肯)", image: "assets/images/b1/ken.png", audio: "assets/audio/b1/ken.mp3" },
+            { word: "Emma", meaning: "Emma (艾瑪)", image: "assets/images/b1/emma.png", audio: "assets/audio/b1/emma.mp3" },
+            { word: "Mike", meaning: "Mike (麥克)", image: "assets/images/b1/mike.png", audio: "assets/audio/b1/mike.mp3" },
+            { word: "Wendy", meaning: "Wendy (溫蒂)", image: "assets/images/b1/wendy.png", audio: "assets/audio/b1/wendy.mp3" },
+            { word: "Alan", meaning: "Alan (艾倫)", image: "assets/images/b1/alan.png", audio: "assets/audio/b1/alan.mp3" }
         ],
         "Topic 1 - Lesson 2: Age": [
-            { word: "how old", phonics: "[ haʊ oʊld ]", meaning: "幾歲", image: "assets/images/b1/how_old.png", audio: "assets/audio/b1/how_old.mp3" },
-            { word: "years old", phonics: "[ jɪrz oʊld ]", meaning: "歲", image: "assets/images/b1/years_old.png", audio: "assets/audio/b1/years_old.mp3" }
+            { word: "how old", meaning: "幾歲", image: "assets/images/b1/how_old.png", audio: "assets/audio/b1/how_old.mp3" },
+            { word: "years old", meaning: "歲", image: "assets/images/b1/years_old.png", audio: "assets/audio/b1/years_old.mp3" }
         ],
         "Topic 2 - Lesson 3: Appearance": [
-            { word: "he", phonics: "[ hiː ]", meaning: "他", image: "assets/images/b1/he.png", audio: "assets/audio/b1/he.mp3" },
-            { word: "she", phonics: "[ ʃiː ]", meaning: "她", image: "assets/images/b1/she.png", audio: "assets/audio/b1/she.mp3" },
-            { word: "strong", phonics: "[ strɔːŋ ]", meaning: "強壯的", image: "assets/images/b1/strong.png", audio: "assets/audio/b1/strong.mp3" },
-            { word: "thin", phonics: "[ θɪn ]", meaning: "瘦的", image: "assets/images/b1/thin.png", audio: "assets/audio/b1/thin.mp3" }, // 🔧 已修正音檔副檔名為 mp3
-            { word: "short", phonics: "[ ʃɔːrt ]", meaning: "矮的", image: "assets/images/b1/short.png", audio: "assets/audio/b1/short.mp3" },
-            { word: "tall", phonics: "[ tɔːl ]", meaning: "高的", image: "assets/images/b1/tall.png", audio: "assets/audio/b1/tall.mp3" }
+            { word: "he", meaning: "他", image: "assets/images/b1/he.png", audio: "assets/audio/b1/he.mp3" },
+            { word: "she", meaning: "她", image: "assets/images/b1/she.png", audio: "assets/audio/b1/she.mp3" },
+            { word: "strong", meaning: "強壯的", image: "assets/images/b1/strong.png", audio: "assets/audio/b1/strong.mp3" },
+            { word: "thin", meaning: "瘦的", image: "assets/images/b1/thin.png", audio: "assets/audio/b1/thin.mp3" },
+            { word: "short", meaning: "矮的", image: "assets/images/b1/short.png", audio: "assets/audio/b1/short.mp3" },
+            { word: "tall", meaning: "高的", image: "assets/images/b1/tall.png", audio: "assets/audio/b1/tall.mp3" }
         ],
         "Topic 2 - Lesson 4: Feelings": [
-            { word: "tired", phonics: "[ ˈtaɪərd ]", meaning: "疲累的", image: "assets/images/b1/tired.png", audio: "assets/audio/b1/tired.mp3" },
-            { word: "angry", phonics: "[ ˈæŋɡri ]", meaning: "生氣的", image: "assets/images/b1/angry.png", audio: "assets/audio/b1/angry.mp3" },
-            { word: "happy", phonics: "[ ˈhæpi ]", meaning: "快樂的", image: "assets/images/b1/happy.png", audio: "assets/audio/b1/happy.mp3" },
-            { word: "sad", phonics: "[ sæd ]", meaning: "難過的", image: "assets/images/b1/sad.png", audio: "assets/audio/b1/sad.mp3" },
-            { word: "yes", phonics: "[ jes ]", meaning: "是的", image: "assets/images/b1/yes.png", audio: "assets/audio/b1/yes.mp3" },
-            { word: "no", phonics: "[ noʊ ]", meaning: "不", image: "assets/images/b1/no.png", audio: "assets/audio/b1/no.mp3" }
+            { word: "tired", meaning: "疲累的", image: "assets/images/b1/tired.png", audio: "assets/audio/b1/tired.mp3" },
+            { word: "angry", meaning: "生氣的", image: "assets/images/b1/angry.png", audio: "assets/audio/b1/angry.mp3" },
+            { word: "happy", meaning: "快樂的", image: "assets/images/b1/happy.png", audio: "assets/audio/b1/happy.mp3" },
+            { word: "sad", meaning: "難過的", image: "assets/images/b1/sad.png", audio: "assets/audio/b1/sad.mp3" },
+            { word: "yes", meaning: "是的", image: "assets/images/b1/yes.png", audio: "assets/audio/b1/yes.mp3" },
+            { word: "no", meaning: "不", image: "assets/images/b1/no.png", audio: "assets/audio/b1/no.mp3" }
         ],
         "Festival: Christmas": [
-            { word: "Christmas tree", phonics: "[ ˈkrɪsməs triː ]", meaning: "耶誕樹", image: "assets/images/b1/christmas_tree.png", audio: "assets/audio/b1/christmas_tree.mp3" },
-            { word: "stocking", phonics: "[ ˈstɑːkɪŋ ]", meaning: "長襪", image: "assets/images/b1/stocking.png", audio: "assets/audio/b1/stocking.mp3" },
-            { word: "gift", phonics: "[ ɡɪft ]", meaning: "禮物", image: "assets/images/b1/gift.png", audio: "assets/audio/b1/gift.mp3" },
-            { word: "Santa Claus", phonics: "[ ˈsæntə klɔːz ]", meaning: "耶誕老人", image: "assets/images/b1/santa_claus.png", audio: "assets/audio/b1/santa_claus.mp3" }
+            { word: "Christmas tree", meaning: "耶誕樹", image: "assets/images/b1/christmas_tree.png", audio: "assets/audio/b1/christmas_tree.mp3" },
+            { word: "stocking", meaning: "長襪", image: "assets/images/b1/stocking.png", audio: "assets/audio/b1/stocking.mp3" },
+            { word: "gift", meaning: "禮物", image: "assets/images/b1/gift.png", audio: "assets/audio/b1/gift.mp3" },
+            { word: "Santa Claus", meaning: "耶誕老人", image: "assets/images/b1/santa_claus.png", audio: "assets/audio/b1/santa_claus.mp3" }
         ]
     };
 
@@ -497,7 +528,7 @@
     let score = 0;
     let wrongWords = [];
 
-    // 📱 iPhone / 手機端音訊解鎖機制
+    // 📱 手機端音訊解鎖機制
     let audioUnlocked = false;
     function unlockAudio() {
         if (audioUnlocked) return;
@@ -522,20 +553,24 @@
     document.addEventListener('click', unlockAudio, { once: true });
 
     function initUnitSelector() {
-        const selectEl = document.getElementById('unitSelect');
-        if (!selectEl) return;
-        selectEl.innerHTML = "";
-        
-        Object.keys(courseData).forEach(unitKey => {
-            const option = document.createElement('option');
-            option.value = unitKey;
-            option.innerText = unitKey;
-            selectEl.appendChild(option);
-        });
+        try {
+            const selectEl = document.getElementById('unitSelect');
+            if (!selectEl) return;
+            selectEl.innerHTML = "";
+            
+            Object.keys(courseData).forEach(unitKey => {
+                const option = document.createElement('option');
+                option.value = unitKey;
+                option.innerText = unitKey;
+                selectEl.appendChild(option);
+            });
 
-        currentUnitKey = Object.keys(courseData)[0];
-        activeWordList = courseData[currentUnitKey];
-        updateFlashcard();
+            currentUnitKey = Object.keys(courseData)[0];
+            activeWordList = courseData[currentUnitKey];
+            updateFlashcard();
+        } catch(err) {
+            console.error("初始化選單失敗:", err);
+        }
     }
 
     function onUnitChange() {
@@ -596,7 +631,6 @@
         const item = activeWordList[currentIndex];
         document.getElementById('fc-img').src = item.image;
         document.getElementById('fc-word').innerText = item.word;
-        document.getElementById('fc-phonics').innerText = item.phonics;
         document.getElementById('fc-meaning').innerText = item.meaning;
     }
     
@@ -727,12 +761,48 @@
         }
     }
 
-    // === 3. 口說測驗邏輯 (iOS PWA 容錯強化版) ===
+    // === 💯 發音 1-100 評分演算法 (Levenshtein Distance) ===
+    function calculatePronunciationScore(spoken, target) {
+        spoken = spoken.toLowerCase().trim().replace(/[.,?!]/g, "");
+        target = target.toLowerCase().trim().replace(/[.,?!]/g, "");
+
+        if (spoken === target) return 100;
+        if (!spoken) return 0;
+
+        // 計算編輯距離
+        const matrix = [];
+        for (let i = 0; i <= target.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= spoken.length; j++) matrix[0][j] = j;
+
+        for (let i = 1; i <= target.length; i++) {
+            for (let j = 1; j <= spoken.length; j++) {
+                if (target[i - 1] === spoken[j - 1]) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
+        }
+
+        const distance = matrix[target.length][spoken.length];
+        const maxLength = Math.max(target.length, spoken.length);
+        const similarity = 1 - (distance / maxLength);
+
+        let score = Math.round(similarity * 100);
+        // 微調分數讓體驗更合理
+        if (score > 85 && score < 90) score = 88;
+        return Math.max(0, Math.min(100, score));
+    }
+
+    // === 3. 口說測驗邏輯 (聲波紋 + 90分才通過機制) ===
     let recognition = null;
     let isRecognizing = false;
     let recognitionTimeout = null;
 
-    // 🛡️ 使用 try...catch 包裹初始化，防止 iOS PWA 模式崩潰阻擋整份 JS 執行
     try {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -744,11 +814,15 @@
             recognition.onstart = function() {
                 isRecognizing = true;
                 const micBtn = document.getElementById('mic-btn');
+                const waveBox = document.getElementById('wave-box');
                 if (micBtn) {
                     micBtn.innerText = "🎙️ 正在聆聽中...";
                     micBtn.style.background = "#ef4444";
                 }
-                document.getElementById('speaking-feedback').innerHTML = "";
+                if (waveBox) waveBox.classList.add('active'); // 開啟聲波紋動畫
+                
+                const feedback = document.getElementById('speaking-feedback');
+                if (feedback) feedback.innerHTML = "";
 
                 clearTimeout(recognitionTimeout);
                 recognitionTimeout = setTimeout(() => {
@@ -763,33 +837,34 @@
                 if (!event.results || !event.results[0]) return;
 
                 const current = currentQuizList[quizIndex];
-                const target = current.word.toLowerCase();
-                const spoken = event.results[0][0].transcript.toLowerCase().trim().replace(/[.,?!]/g, "");
+                const target = current.word;
+                const spoken = event.results[0][0].transcript;
 
-                if (spoken.includes(target) || (target.includes(spoken) && spoken.length >= target.length - 1)) {
+                // 計算 1-100 分數
+                const pronScore = calculatePronunciationScore(spoken, target);
+
+                // 🌟 核心規則：達到 90 分才算通過跳下一題
+                if (pronScore >= 90) {
                     clearTimeout(recognitionTimeout);
                     stopRecognition();
                     
                     score++;
-                    showSpeakingFeedback(true, `🎉 發音標準！<br><small>聽到：${spoken}</small>`);
+                    showSpeakingFeedback(true, `🎉 發音超讚！<b>(${pronScore}分)</b><br><small>聽到：${spoken}</small>`);
                     
                     setTimeout(() => {
                         quizIndex++;
                         loadSpeakingQuestion();
-                    }, 1000);
+                    }, 1200);
                     return;
                 }
 
+                // 若語音結束但未滿 90 分，提示繼續嘗試
                 if (event.results[0].isFinal) {
                     clearTimeout(recognitionTimeout);
                     stopRecognition();
                     if (!wrongWords.includes(current)) wrongWords.push(current);
                     
-                    showSpeakingFeedback(false, `❌ 發音不太對喔！聽到：<b>${spoken}</b>`);
-                    setTimeout(() => {
-                        quizIndex++;
-                        loadSpeakingQuestion();
-                    }, 2000);
+                    showSpeakingFeedback(false, `💪 再試一次！得分：<b>${pronScore}分</b> (需90分過關)<br><small>聽到：${spoken}</small>`);
                 }
             };
 
@@ -797,9 +872,6 @@
                 clearTimeout(recognitionTimeout);
                 stopRecognition();
                 console.warn("辨識錯誤:", event.error);
-                if (event.error === 'not-allowed') {
-                    alert("請允許存取麥克風權限！");
-                }
             };
 
             recognition.onend = function() {
@@ -807,17 +879,21 @@
             };
         }
     } catch(err) {
-        console.warn("目前環境不支援原生 Web Speech API (iOS PWA 模式限制):", err);
+        console.warn("目前裝置環境不支援 Speech API:", err);
     }
 
     function stopRecognition() {
         isRecognizing = false;
         clearTimeout(recognitionTimeout);
         const micBtn = document.getElementById('mic-btn');
+        const waveBox = document.getElementById('wave-box');
+        
         if (micBtn) {
             micBtn.innerText = "🎙️ 按下開始唸單字";
             micBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
         }
+        if (waveBox) waveBox.classList.remove('active'); // 關閉聲波紋動畫
+        
         if (recognition) {
             try { recognition.abort(); } catch(e) {}
         }
@@ -827,7 +903,7 @@
         unlockAudio();
         
         if (!recognition) {
-            alert("iOS App 模式下 Apple 系統暫不支援內建麥克風辨識。建議直接使用 Safari 瀏覽器打開網頁體驗口說測驗！");
+            alert("您的瀏覽器或 App 模式暫不支援語音辨識。建議開啟 Safari / Chrome 網頁版體驗口說功能！");
             return;
         }
 
@@ -881,7 +957,6 @@
         const item = currentQuizList[quizIndex];
         document.getElementById('sp-img').src = item.image;
         document.getElementById('sp-word').innerText = item.word;
-        document.getElementById('sp-phonics').innerText = item.phonics;
         document.getElementById('sp-meaning').innerText = item.meaning;
         document.getElementById('speaking-feedback').className = "feedback-box";
         document.getElementById('speaking-feedback').innerHTML = "";
@@ -916,8 +991,12 @@
         }
     }
 
-    // 🚀 初始化應用程式
-    initUnitSelector();
+    // 🚀 安全確保：當頁面 DOM 載入完成時，一定強制初始化選單
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initUnitSelector);
+    } else {
+        initUnitSelector();
+    }
 </script>
 
 </body>

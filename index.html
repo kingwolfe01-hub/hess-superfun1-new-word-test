@@ -718,7 +718,7 @@
         }
     }
 
-    // === 3. 口說測驗邏輯 (防延遲/防當機優化版) ===
+    // === 3. 口說測驗邏輯 (0.2秒極速響應與防卡死版) ===
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
     let isRecognizing = false;
@@ -727,77 +727,73 @@
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.lang = 'en-US';
-        recognition.continuous = false;     // 單次辨識，降低資源占用
-        recognition.interimResults = false; // 僅取最終結果
+        recognition.continuous = false;
+        recognition.interimResults = true; // 🌟 開啟即時比對，不等靜音結束！
 
         recognition.onstart = function() {
             isRecognizing = true;
             const micBtn = document.getElementById('mic-btn');
-            micBtn.innerText = "🎙️ 聆聽中...請清楚朗讀";
-            micBtn.style.opacity = "0.7";
+            micBtn.innerText = "🎙️ 正在聆聽中...";
+            micBtn.style.background = "#ef4444"; // 變紅色提醒收音中
             document.getElementById('speaking-feedback').innerHTML = "";
 
-            // 防卡死超時保護 (6 秒無回應自動關閉)
+            // 6 秒超時保護，避免手機連線問題卡死
             clearTimeout(recognitionTimeout);
             recognitionTimeout = setTimeout(() => {
                 if (isRecognizing) {
                     stopRecognition();
-                    const feedback = document.getElementById('speaking-feedback');
-                    feedback.className = "feedback-box incorrect";
-                    feedback.innerHTML = "⏱️ 沒有聽到聲音，請再試一次喔！";
+                    showSpeakingFeedback(false, "⏱️ 沒有聽到聲音，請再試一次喔！");
                 }
             }, 6000);
         };
 
-        recognition.onspeechend = function() {
-            stopRecognition();
-        };
-
         recognition.onresult = function(event) {
-            clearTimeout(recognitionTimeout);
-            stopRecognition();
-
             if (!event.results || !event.results[0]) return;
 
-            const spoken = event.results[0][0].transcript.toLowerCase().trim().replace(/[.,?!]/g, "");
             const current = currentQuizList[quizIndex];
             const target = current.word.toLowerCase();
-            const feedback = document.getElementById('speaking-feedback');
+            const spoken = event.results[0][0].transcript.toLowerCase().trim().replace(/[.,?!]/g, "");
 
-            if (spoken === target) {
+            // 🌟 實時即時比對：只要包含目標字串，立刻判定成功並中斷錄音！
+            if (spoken.includes(target) || (target.includes(spoken) && spoken.length >= target.length - 1)) {
+                clearTimeout(recognitionTimeout);
+                stopRecognition(); // 瞬間關閉麥克風
+                
                 score++;
-                feedback.className = "feedback-box correct";
-                feedback.innerHTML = `🎉 發音標準！<br><small>聽到：${spoken}</small>`;
+                showSpeakingFeedback(true, `🎉 發音標準！<br><small>聽到：${spoken}</small>`);
+                
                 setTimeout(() => {
                     quizIndex++;
                     loadSpeakingQuestion();
-                }, 1200);
-            } else {
+                }, 1000);
+                return;
+            }
+
+            // 若最終結果產出但比對不符
+            if (event.results[0].isFinal) {
+                clearTimeout(recognitionTimeout);
+                stopRecognition();
                 if (!wrongWords.includes(current)) wrongWords.push(current);
-                feedback.className = "feedback-box incorrect";
-                feedback.innerHTML = `
-                    <div>❌ 發音不太對喔！聽到：<b>${spoken}</b></div>
-                    <button class="btn btn-outline" style="margin-top:5px; padding:4px 10px; font-size:0.85rem;" onclick="playAudio(currentQuizList[quizIndex])">🔊 聽正確示範</button>
-                `;
+                
+                showSpeakingFeedback(false, `❌ 發音不太對喔！聽到：<b>${spoken}</b>`);
                 setTimeout(() => {
                     quizIndex++;
                     loadSpeakingQuestion();
-                }, 2200);
+                }, 2000);
             }
         };
 
         recognition.onerror = function(event) {
             clearTimeout(recognitionTimeout);
             stopRecognition();
-            console.warn("語音辨識錯誤:", event.error);
-            
-            const feedback = document.getElementById('speaking-feedback');
+            console.warn("辨識錯誤:", event.error);
             if (event.error === 'not-allowed') {
-                alert("請允許瀏覽器存取麥克風權限！");
-            } else if (event.error !== 'no-speech') {
-                feedback.className = "feedback-box incorrect";
-                feedback.innerHTML = "⚠️ 辨識微卡頓，請再點擊一次麥克風";
+                alert("請允許存取麥克風權限！");
             }
+        };
+
+        recognition.onend = function() {
+            stopRecognition();
         };
     }
 
@@ -807,10 +803,10 @@
         const micBtn = document.getElementById('mic-btn');
         if (micBtn) {
             micBtn.innerText = "🎙️ 按下開始唸單字";
-            micBtn.style.opacity = "1";
+            micBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
         }
         if (recognition) {
-            try { recognition.stop(); } catch(e) {}
+            try { recognition.abort(); } catch(e) {}
         }
     }
 
@@ -831,11 +827,16 @@
             recognition.abort();
             setTimeout(() => {
                 recognition.start();
-            }, 100);
+            }, 50);
         } catch (e) {
-            console.error("啟動辨識失敗:", e);
             stopRecognition();
         }
+    }
+
+    function showSpeakingFeedback(isCorrect, htmlContent) {
+        const feedback = document.getElementById('speaking-feedback');
+        feedback.className = isCorrect ? "feedback-box correct" : "feedback-box incorrect";
+        feedback.innerHTML = htmlContent;
     }
 
     function restartSpeakingQuiz() {

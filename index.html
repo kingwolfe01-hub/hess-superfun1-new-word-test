@@ -448,7 +448,7 @@
             { word: "he", phonics: "[ hiː ]", meaning: "他", image: "assets/images/b1/he.png", audio: "assets/audio/b1/he.mp3" },
             { word: "she", phonics: "[ ʃiː ]", meaning: "她", image: "assets/images/b1/she.png", audio: "assets/audio/b1/she.mp3" },
             { word: "strong", phonics: "[ strɔːŋ ]", meaning: "強壯的", image: "assets/images/b1/strong.png", audio: "assets/audio/b1/strong.mp3" },
-            { word: "thin", phonics: "[ θɪn ]", meaning: "瘦的", image: "assets/images/b1/thin.png", audio: "assets/audio/b1/thin.png" },
+            { word: "thin", phonics: "[ θɪn ]", meaning: "瘦的", image: "assets/images/b1/thin.png", audio: "assets/audio/b1/thin.mp3" }, // 🔧 已修正音檔副檔名為 mp3
             { word: "short", phonics: "[ ʃɔːrt ]", meaning: "矮的", image: "assets/images/b1/short.png", audio: "assets/audio/b1/short.mp3" },
             { word: "tall", phonics: "[ tɔːl ]", meaning: "高的", image: "assets/images/b1/tall.png", audio: "assets/audio/b1/tall.mp3" }
         ],
@@ -502,16 +502,18 @@
     function unlockAudio() {
         if (audioUnlocked) return;
         
-        const silentAudio = new Audio();
-        silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
-        silentAudio.play().then(() => {
-            audioUnlocked = true;
-        }).catch(() => {});
+        try {
+            const silentAudio = new Audio();
+            silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+            silentAudio.play().then(() => {
+                audioUnlocked = true;
+            }).catch(() => {});
 
-        if ('speechSynthesis' in window) {
-            const emptyUtterance = new SpeechSynthesisUtterance("");
-            window.speechSynthesis.speak(emptyUtterance);
-        }
+            if ('speechSynthesis' in window) {
+                const emptyUtterance = new SpeechSynthesisUtterance("");
+                window.speechSynthesis.speak(emptyUtterance);
+            }
+        } catch(e) {}
 
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('click', unlockAudio);
@@ -521,6 +523,7 @@
 
     function initUnitSelector() {
         const selectEl = document.getElementById('unitSelect');
+        if (!selectEl) return;
         selectEl.innerHTML = "";
         
         Object.keys(courseData).forEach(unitKey => {
@@ -662,3 +665,260 @@
             btn.appendChild(img);
             btn.onclick = () => checkListeningAnswer(opt, current);
             optionsContainer.appendChild(btn);
+        });
+
+        if (audioUnlocked) {
+            playQuizAudio();
+        }
+    }
+
+    function playQuizAudio() { playAudio(currentQuizList[quizIndex]); }
+
+    function checkListeningAnswer(selected, correct) {
+        const feedback = document.getElementById('listening-feedback');
+        if (selected.word === correct.word) {
+            score++;
+            feedback.className = "feedback-box correct";
+            feedback.innerHTML = "🎉 答對了！非常棒！";
+            setTimeout(() => {
+                quizIndex++;
+                loadListeningQuestion();
+            }, 1200);
+        } else {
+            if (!wrongWords.includes(correct)) wrongWords.push(correct);
+            feedback.className = "feedback-box incorrect";
+            feedback.innerHTML = `
+                <div>❌ 答錯囉！正確答案是：<strong>${correct.word}</strong> (${correct.meaning})</div>
+                <button class="btn btn-outline" style="margin-top:5px; padding:4px 10px; font-size:0.85rem;" onclick="playAudio(currentQuizList[quizIndex])">🔊 聽正確發音</button>
+            `;
+            setTimeout(() => {
+                quizIndex++;
+                loadListeningQuestion();
+            }, 2200);
+        }
+    }
+
+    function showListeningResult() {
+        document.getElementById('listening-quiz-view').style.display = 'none';
+        document.getElementById('listening-result-view').style.display = 'flex';
+        
+        const percentage = Math.round((score / currentQuizList.length) * 100);
+        document.getElementById('list-score-text').innerText = `得分：${score} / ${currentQuizList.length} (${percentage}分)`;
+        
+        let stars = "⭐";
+        if (percentage >= 80) stars = "⭐⭐⭐";
+        else if (percentage >= 60) stars = "⭐⭐";
+        document.getElementById('list-stars').innerText = stars;
+
+        const wrongContainer = document.getElementById('list-wrong-container');
+        const reviewBtn = document.getElementById('list-review-btn');
+        
+        if (wrongWords.length > 0) {
+            let html = `<div class="wrong-list"><strong>需要加強的單字：</strong><ul>`;
+            wrongWords.forEach(w => {
+                html += `<li class="wrong-item">${w.word} - ${w.meaning}</li>`;
+            });
+            html += `</ul></div>`;
+            wrongContainer.innerHTML = html;
+            reviewBtn.style.display = 'flex';
+        } else {
+            wrongContainer.innerHTML = `<p style="color:#10b981; font-weight:bold; font-size:1.1rem; margin-top:10px;">預祝考試拿滿分！🎉</p>`;
+            reviewBtn.style.display = 'none';
+        }
+    }
+
+    // === 3. 口說測驗邏輯 (iOS PWA 容錯強化版) ===
+    let recognition = null;
+    let isRecognizing = false;
+    let recognitionTimeout = null;
+
+    // 🛡️ 使用 try...catch 包裹初始化，防止 iOS PWA 模式崩潰阻擋整份 JS 執行
+    try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = function() {
+                isRecognizing = true;
+                const micBtn = document.getElementById('mic-btn');
+                if (micBtn) {
+                    micBtn.innerText = "🎙️ 正在聆聽中...";
+                    micBtn.style.background = "#ef4444";
+                }
+                document.getElementById('speaking-feedback').innerHTML = "";
+
+                clearTimeout(recognitionTimeout);
+                recognitionTimeout = setTimeout(() => {
+                    if (isRecognizing) {
+                        stopRecognition();
+                        showSpeakingFeedback(false, "⏱️ 沒有聽到聲音，請再試一次喔！");
+                    }
+                }, 6000);
+            };
+
+            recognition.onresult = function(event) {
+                if (!event.results || !event.results[0]) return;
+
+                const current = currentQuizList[quizIndex];
+                const target = current.word.toLowerCase();
+                const spoken = event.results[0][0].transcript.toLowerCase().trim().replace(/[.,?!]/g, "");
+
+                if (spoken.includes(target) || (target.includes(spoken) && spoken.length >= target.length - 1)) {
+                    clearTimeout(recognitionTimeout);
+                    stopRecognition();
+                    
+                    score++;
+                    showSpeakingFeedback(true, `🎉 發音標準！<br><small>聽到：${spoken}</small>`);
+                    
+                    setTimeout(() => {
+                        quizIndex++;
+                        loadSpeakingQuestion();
+                    }, 1000);
+                    return;
+                }
+
+                if (event.results[0].isFinal) {
+                    clearTimeout(recognitionTimeout);
+                    stopRecognition();
+                    if (!wrongWords.includes(current)) wrongWords.push(current);
+                    
+                    showSpeakingFeedback(false, `❌ 發音不太對喔！聽到：<b>${spoken}</b>`);
+                    setTimeout(() => {
+                        quizIndex++;
+                        loadSpeakingQuestion();
+                    }, 2000);
+                }
+            };
+
+            recognition.onerror = function(event) {
+                clearTimeout(recognitionTimeout);
+                stopRecognition();
+                console.warn("辨識錯誤:", event.error);
+                if (event.error === 'not-allowed') {
+                    alert("請允許存取麥克風權限！");
+                }
+            };
+
+            recognition.onend = function() {
+                stopRecognition();
+            };
+        }
+    } catch(err) {
+        console.warn("目前環境不支援原生 Web Speech API (iOS PWA 模式限制):", err);
+    }
+
+    function stopRecognition() {
+        isRecognizing = false;
+        clearTimeout(recognitionTimeout);
+        const micBtn = document.getElementById('mic-btn');
+        if (micBtn) {
+            micBtn.innerText = "🎙️ 按下開始唸單字";
+            micBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
+        }
+        if (recognition) {
+            try { recognition.abort(); } catch(e) {}
+        }
+    }
+
+    function startSpeechRecognition() {
+        unlockAudio();
+        
+        if (!recognition) {
+            alert("iOS App 模式下 Apple 系統暫不支援內建麥克風辨識。建議直接使用 Safari 瀏覽器打開網頁體驗口說測驗！");
+            return;
+        }
+
+        if (isRecognizing) {
+            stopRecognition();
+            return;
+        }
+
+        try {
+            recognition.abort();
+            setTimeout(() => {
+                recognition.start();
+            }, 50);
+        } catch (e) {
+            stopRecognition();
+        }
+    }
+
+    function showSpeakingFeedback(isCorrect, htmlContent) {
+        const feedback = document.getElementById('speaking-feedback');
+        if (feedback) {
+            feedback.className = isCorrect ? "feedback-box correct" : "feedback-box incorrect";
+            feedback.innerHTML = htmlContent;
+        }
+    }
+
+    function restartSpeakingQuiz() {
+        currentQuizList = [...activeWordList].sort(() => 0.5 - Math.random());
+        startSpeakingQuiz();
+    }
+    function startSpeakingReview() {
+        currentQuizList = [...wrongWords].sort(() => 0.5 - Math.random());
+        startSpeakingQuiz();
+    }
+    function startSpeakingQuiz() {
+        quizIndex = 0;
+        score = 0;
+        wrongWords = [];
+        document.getElementById('speaking-quiz-view').style.display = 'flex';
+        document.getElementById('speaking-result-view').style.display = 'none';
+        loadSpeakingQuestion();
+    }
+
+    function loadSpeakingQuestion() {
+        if (quizIndex >= currentQuizList.length) {
+            showSpeakingResult();
+            return;
+        }
+
+        document.getElementById('spk-progress').innerText = `題目 ${quizIndex + 1} / ${currentQuizList.length}`;
+        const item = currentQuizList[quizIndex];
+        document.getElementById('sp-img').src = item.image;
+        document.getElementById('sp-word').innerText = item.word;
+        document.getElementById('sp-phonics').innerText = item.phonics;
+        document.getElementById('sp-meaning').innerText = item.meaning;
+        document.getElementById('speaking-feedback').className = "feedback-box";
+        document.getElementById('speaking-feedback').innerHTML = "";
+    }
+
+    function showSpeakingResult() {
+        document.getElementById('speaking-quiz-view').style.display = 'none';
+        document.getElementById('speaking-result-view').style.display = 'flex';
+        
+        const percentage = Math.round((score / currentQuizList.length) * 100);
+        document.getElementById('spk-score-text').innerText = `得分：${score} / ${currentQuizList.length} (${percentage}分)`;
+        
+        let stars = "⭐";
+        if (percentage >= 80) stars = "⭐⭐⭐";
+        else if (percentage >= 60) stars = "⭐⭐";
+        document.getElementById('spk-stars').innerText = stars;
+
+        const wrongContainer = document.getElementById('spk-wrong-container');
+        const reviewBtn = document.getElementById('spk-review-btn');
+        
+        if (wrongWords.length > 0) {
+            let html = `<div class="wrong-list"><strong>發音需加強的單字：</strong><ul>`;
+            wrongWords.forEach(w => {
+                html += `<li class="wrong-item">${w.word} - ${w.meaning}</li>`;
+            });
+            html += `</ul></div>`;
+            wrongContainer.innerHTML = html;
+            reviewBtn.style.display = 'flex';
+        } else {
+            wrongContainer.innerHTML = `<p style="color:#10b981; font-weight:bold; font-size:1.1rem; margin-top:10px;">發音大師！全對過關！🎉</p>`;
+            reviewBtn.style.display = 'none';
+        }
+    }
+
+    // 🚀 初始化應用程式
+    initUnitSelector();
+</script>
+
+</body>
+</html>

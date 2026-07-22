@@ -158,6 +158,7 @@
             margin-bottom: 16px;
             box-shadow: 0 8px 16px rgba(0,0,0,0.08);
             background-color: #f8fafc;
+            will-change: transform;
         }
 
         .word-text {
@@ -271,7 +272,7 @@
         .correct { color: #047857; background-color: #d1fae5; }
         .incorrect { color: #b91c1c; background-color: #fee2e2; }
 
-        /* 🌊 動態聲波紋樣式 */
+        /* 🌊 實時聲波紋樣式 */
         .wave-container {
             display: none;
             justify-content: center;
@@ -290,18 +291,7 @@
             height: 8px;
             background: #10b981;
             border-radius: 3px;
-            animation: waveAnim 0.8s infinite ease-in-out alternate;
-        }
-
-        .wave-bar:nth-child(1) { animation-delay: 0.0s; }
-        .wave-bar:nth-child(2) { animation-delay: 0.15s; }
-        .wave-bar:nth-child(3) { animation-delay: 0.3s; }
-        .wave-bar:nth-child(4) { animation-delay: 0.45s; }
-        .wave-bar:nth-child(5) { animation-delay: 0.6s; }
-
-        @keyframes waveAnim {
-            0% { height: 8px; background: #10b981; }
-            100% { height: 32px; background: #059669; }
+            transition: height 0.05s ease;
         }
 
         .progress-badge {
@@ -314,9 +304,12 @@
             margin-bottom: 10px;
         }
 
-        .score-stars { font-size: 3rem; margin: 15px 0; }
-        .wrong-list { text-align: left; background: #f8fafc; padding: 15px; border-radius: 16px; margin-top: 15px; width: 100%; }
-        .wrong-item { margin-bottom: 6px; color: #ef4444; font-weight: bold; }
+        .score-stars { font-size: 3rem; margin: 10px 0 5px 0; }
+        .wrong-list { text-align: left; background: #f8fafc; padding: 12px; border-radius: 16px; margin-top: 10px; width: 100%; max-height: 220px; overflow-y: auto; }
+        .wrong-item { display: flex; justify-content: space-between; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px border #e2e8f0; font-weight: bold; }
+        .score-tag { padding: 2px 8px; border-radius: 8px; font-size: 0.85rem; color: white; }
+        .score-pass { background-color: #10b981; }
+        .score-fail { background-color: #ef4444; }
     </style>
 </head>
 <body>
@@ -324,8 +317,7 @@
 <div class="app-viewport">
     <div class="app-header">
         <h1 class="app-title">Super Fun 1 單字學習方程式</h1>
-        <select id="unitSelect" class="select-input" onchange="onUnitChange()">
-            </select>
+        <select id="unitSelect" class="select-input" onchange="onUnitChange()"></select>
     </div>
 
     <div class="nav-tabs">
@@ -400,19 +392,18 @@
             </div>
 
             <div id="speaking-result-view" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-                <h3>🎉 口說測驗完成！</h3>
+                <h3>🎉 口說測驗成績單</h3>
                 <div class="score-stars" id="spk-stars">⭐⭐⭐</div>
-                <p id="spk-score-text" style="font-size: 1.3rem; font-weight: 800; color: #1e293b;"></p>
+                <p id="spk-score-text" style="font-size: 1.2rem; font-weight: 800; color: #1e293b; margin: 0 0 10px 0;"></p>
                 <div id="spk-wrong-container" style="width: 100%;"></div>
-                <button class="btn btn-primary" style="margin-top: 15px;" onclick="restartSpeakingQuiz()">🔄 重新測驗</button>
-                <button class="btn btn-warning" id="spk-review-btn" style="display: none; margin-top: 10px;" onclick="startSpeakingReview()">✏️ 針對錯題做練習</button>
+                <button class="btn btn-primary" style="margin-top: 12px;" onclick="restartSpeakingQuiz()">🔄 全單元重新測驗</button>
+                <button class="btn btn-warning" id="spk-review-btn" style="display: none; margin-top: 8px;" onclick="startSpeakingReview()">✏️ 針對未達標單字修正</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // === Super Fun 1 基礎單元資料庫 ===
     const rawUnits = {
         "🔢 Numbers 數字 1-10": [
             { word: "one", meaning: "一", image: "assets/images/b1/one.png", audio: "assets/audio/b1/one.mp3" },
@@ -527,18 +518,34 @@
     let quizIndex = 0;
     let score = 0;
     let wrongWords = [];
+    let speakingScoreLogs = []; // 📊 紀錄口說每個單字成績
 
-    // 📱 手機端音訊解鎖機制
+    const imageCache = {};
+    const audioCache = {};
+
+    function preloadAssets(wordList) {
+        if (!wordList) return;
+        wordList.forEach(item => {
+            if (item.image && !imageCache[item.image]) {
+                const img = new Image();
+                img.src = item.image;
+                imageCache[item.image] = img;
+            }
+            if (item.audio && !audioCache[item.audio]) {
+                const aud = new Audio();
+                aud.src = item.audio;
+                audioCache[item.audio] = aud;
+            }
+        });
+    }
+
     let audioUnlocked = false;
     function unlockAudio() {
         if (audioUnlocked) return;
-        
         try {
             const silentAudio = new Audio();
             silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
-            silentAudio.play().then(() => {
-                audioUnlocked = true;
-            }).catch(() => {});
+            silentAudio.play().then(() => { audioUnlocked = true; }).catch(() => {});
 
             if ('speechSynthesis' in window) {
                 const emptyUtterance = new SpeechSynthesisUtterance("");
@@ -567,6 +574,7 @@
 
             currentUnitKey = Object.keys(courseData)[0];
             activeWordList = courseData[currentUnitKey];
+            preloadAssets(activeWordList);
             updateFlashcard();
         } catch(err) {
             console.error("初始化選單失敗:", err);
@@ -578,6 +586,7 @@
         const selectEl = document.getElementById('unitSelect');
         currentUnitKey = selectEl.value;
         activeWordList = courseData[currentUnitKey];
+        preloadAssets(activeWordList);
         currentIndex = 0;
 
         if (currentMode === 'flashcard') updateFlashcard();
@@ -609,7 +618,8 @@
     function playAudio(item) {
         unlockAudio();
         if (item && item.audio) {
-            const audio = new Audio(item.audio);
+            const audio = audioCache[item.audio] || new Audio(item.audio);
+            audio.currentTime = 0;
             audio.play().catch(() => speakText(item.word));
         } else if (item) {
             speakText(item.word);
@@ -632,16 +642,17 @@
         document.getElementById('fc-img').src = item.image;
         document.getElementById('fc-word').innerText = item.word;
         document.getElementById('fc-meaning').innerText = item.meaning;
+
+        const nextIdx = (currentIndex + 1) % activeWordList.length;
+        preloadAssets([activeWordList[nextIdx]]);
     }
     
     function playCurrentWordAudio() { playAudio(activeWordList[currentIndex]); }
-    
     function nextWord() {
         currentIndex = (currentIndex + 1) % activeWordList.length;
         updateFlashcard();
         playCurrentWordAudio();
     }
-    
     function prevWord() {
         currentIndex = (currentIndex - 1 + activeWordList.length) % activeWordList.length;
         updateFlashcard();
@@ -717,7 +728,7 @@
             setTimeout(() => {
                 quizIndex++;
                 loadListeningQuestion();
-            }, 1200);
+            }, 800);
         } else {
             if (!wrongWords.includes(correct)) wrongWords.push(correct);
             feedback.className = "feedback-box incorrect";
@@ -728,7 +739,7 @@
             setTimeout(() => {
                 quizIndex++;
                 loadListeningQuestion();
-            }, 2200);
+            }, 1800);
         }
     }
 
@@ -761,7 +772,7 @@
         }
     }
 
-    // === 💯 發音 1-100 評分演算法 (Levenshtein Distance) ===
+    // === 💯 發音 1-100 評分演算法 ===
     function calculatePronunciationScore(spoken, target) {
         spoken = spoken.toLowerCase().trim().replace(/[.,?!]/g, "");
         target = target.toLowerCase().trim().replace(/[.,?!]/g, "");
@@ -769,7 +780,6 @@
         if (spoken === target) return 100;
         if (!spoken) return 0;
 
-        // 計算編輯距離
         const matrix = [];
         for (let i = 0; i <= target.length; i++) matrix[i] = [i];
         for (let j = 0; j <= spoken.length; j++) matrix[0][j] = j;
@@ -793,15 +803,50 @@
         const similarity = 1 - (distance / maxLength);
 
         let score = Math.round(similarity * 100);
-        // 微調分數讓體驗更合理
         if (score > 85 && score < 90) score = 88;
         return Math.max(0, Math.min(100, score));
     }
 
-    // === 3. 口說測驗邏輯 (聲波紋 + 90分才通過機制) ===
+    // === 3. 口說測驗邏輯 (不卡關 + 全單字紀錄 + 結尾修正版) ===
     let recognition = null;
     let isRecognizing = false;
     let recognitionTimeout = null;
+    let audioCtx = null;
+    let analyser = null;
+    let micStream = null;
+    let animFrameId = null;
+
+    function startRealtimeWave() {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            micStream = stream;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            const source = audioCtx.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 32;
+
+            const waveBars = document.querySelectorAll('.wave-bar');
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            function updateWave() {
+                analyser.getByteFrequencyData(dataArray);
+                let avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+                
+                waveBars.forEach((bar, idx) => {
+                    let h = Math.min(32, Math.max(8, (avg / 128) * 32 * (1 + idx * 0.15)));
+                    bar.style.height = h + 'px';
+                });
+                animFrameId = requestAnimationFrame(updateWave);
+            }
+            updateWave();
+        }).catch(() => {});
+    }
+
+    function stopRealtimeWave() {
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+        if (micStream) micStream.getTracks().forEach(track => track.stop());
+        if (audioCtx) try { audioCtx.close(); } catch(e) {}
+    }
 
     try {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -819,18 +864,21 @@
                     micBtn.innerText = "🎙️ 正在聆聽中...";
                     micBtn.style.background = "#ef4444";
                 }
-                if (waveBox) waveBox.classList.add('active'); // 開啟聲波紋動畫
+                if (waveBox) waveBox.classList.add('active');
                 
+                startRealtimeWave();
+
                 const feedback = document.getElementById('speaking-feedback');
                 if (feedback) feedback.innerHTML = "";
 
+                // 超時保護：若沒說話視為 0 分並自動跳下一題
                 clearTimeout(recognitionTimeout);
                 recognitionTimeout = setTimeout(() => {
                     if (isRecognizing) {
                         stopRecognition();
-                        showSpeakingFeedback(false, "⏱️ 沒有聽到聲音，請再試一次喔！");
+                        processSpeakingResult("", 0);
                     }
-                }, 6000);
+                }, 5000);
             };
 
             recognition.onresult = function(event) {
@@ -840,38 +888,27 @@
                 const target = current.word;
                 const spoken = event.results[0][0].transcript;
 
-                // 計算 1-100 分數
                 const pronScore = calculatePronunciationScore(spoken, target);
 
-                // 🌟 核心規則：達到 90 分才算通過跳下一題
+                // 🌟 當辨識分數達 90 分（高分），立刻紀錄並跳下一題
                 if (pronScore >= 90) {
                     clearTimeout(recognitionTimeout);
                     stopRecognition();
-                    
-                    score++;
-                    showSpeakingFeedback(true, `🎉 發音超讚！<b>(${pronScore}分)</b><br><small>聽到：${spoken}</small>`);
-                    
-                    setTimeout(() => {
-                        quizIndex++;
-                        loadSpeakingQuestion();
-                    }, 1200);
+                    processSpeakingResult(spoken, pronScore);
                     return;
                 }
 
-                // 若語音結束但未滿 90 分，提示繼續嘗試
+                // 🌟 當語音結束且未達 90 分，紀錄成績後一樣跳下一題（不卡關）
                 if (event.results[0].isFinal) {
                     clearTimeout(recognitionTimeout);
                     stopRecognition();
-                    if (!wrongWords.includes(current)) wrongWords.push(current);
-                    
-                    showSpeakingFeedback(false, `💪 再試一次！得分：<b>${pronScore}分</b> (需90分過關)<br><small>聽到：${spoken}</small>`);
+                    processSpeakingResult(spoken, pronScore);
                 }
             };
 
             recognition.onerror = function(event) {
                 clearTimeout(recognitionTimeout);
                 stopRecognition();
-                console.warn("辨識錯誤:", event.error);
             };
 
             recognition.onend = function() {
@@ -882,9 +919,39 @@
         console.warn("目前裝置環境不支援 Speech API:", err);
     }
 
+    // 處理當前題目的口說分數，紀錄後自動推進
+    function processSpeakingResult(spoken, pronScore) {
+        const current = currentQuizList[quizIndex];
+        const isPass = pronScore >= 90;
+
+        // 紀錄成績
+        speakingScoreLogs.push({
+            item: current,
+            spoken: spoken || "(未偵測到聲音)",
+            score: pronScore,
+            isPass: isPass
+        });
+
+        if (isPass) {
+            score++;
+            showSpeakingFeedback(true, `🎉 發音超讚！<b>(${pronScore}分)</b><br><small>聽到：${spoken}</small>`);
+        } else {
+            if (!wrongWords.includes(current)) wrongWords.push(current);
+            showSpeakingFeedback(false, `💪 得分：<b>${pronScore}分</b> (未達 90 分)<br><small>聽到：${spoken || '無 sound'}</small>`);
+        }
+
+        // 🌟 核心修改：不論對錯，1.5 秒後統一推進到下一題，不阻擋測驗
+        setTimeout(() => {
+            quizIndex++;
+            loadSpeakingQuestion();
+        }, 1500);
+    }
+
     function stopRecognition() {
         isRecognizing = false;
         clearTimeout(recognitionTimeout);
+        stopRealtimeWave();
+
         const micBtn = document.getElementById('mic-btn');
         const waveBox = document.getElementById('wave-box');
         
@@ -892,7 +959,7 @@
             micBtn.innerText = "🎙️ 按下開始唸單字";
             micBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
         }
-        if (waveBox) waveBox.classList.remove('active'); // 關閉聲波紋動畫
+        if (waveBox) waveBox.classList.remove('active');
         
         if (recognition) {
             try { recognition.abort(); } catch(e) {}
@@ -913,10 +980,18 @@
         }
 
         try {
+            const targetWord = currentQuizList[quizIndex].word;
+            const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+            if (SpeechGrammarList) {
+                const speechGrammarList = new SpeechGrammarList();
+                speechGrammarList.addFromString(`#JSGF V1.0; grammar word; public <word> = ${targetWord} ;`, 1);
+                recognition.grammars = speechGrammarList;
+            }
+
             recognition.abort();
             setTimeout(() => {
                 recognition.start();
-            }, 50);
+            }, 30);
         } catch (e) {
             stopRecognition();
         }
@@ -934,14 +1009,18 @@
         currentQuizList = [...activeWordList].sort(() => 0.5 - Math.random());
         startSpeakingQuiz();
     }
+    
+    // ✏️ 結尾修正補強：只針對沒滿 90 分的單字重新練習
     function startSpeakingReview() {
         currentQuizList = [...wrongWords].sort(() => 0.5 - Math.random());
         startSpeakingQuiz();
     }
+
     function startSpeakingQuiz() {
         quizIndex = 0;
         score = 0;
         wrongWords = [];
+        speakingScoreLogs = []; // 清空成績紀錄
         document.getElementById('speaking-quiz-view').style.display = 'flex';
         document.getElementById('speaking-result-view').style.display = 'none';
         loadSpeakingQuestion();
@@ -966,32 +1045,42 @@
         document.getElementById('speaking-quiz-view').style.display = 'none';
         document.getElementById('speaking-result-view').style.display = 'flex';
         
-        const percentage = Math.round((score / currentQuizList.length) * 100);
-        document.getElementById('spk-score-text').innerText = `得分：${score} / ${currentQuizList.length} (${percentage}分)`;
+        const totalWords = currentQuizList.length;
+        const passCount = speakingScoreLogs.filter(log => log.isPass).length;
+        const avgScore = Math.round(speakingScoreLogs.reduce((acc, cur) => acc + cur.score, 0) / (totalWords || 1));
+
+        document.getElementById('spk-score-text').innerText = `達標：${passCount} / ${totalWords} 題 (平均：${avgScore}分)`;
         
         let stars = "⭐";
-        if (percentage >= 80) stars = "⭐⭐⭐";
-        else if (percentage >= 60) stars = "⭐⭐";
+        if (avgScore >= 90) stars = "⭐⭐⭐";
+        else if (avgScore >= 70) stars = "⭐⭐";
         document.getElementById('spk-stars').innerText = stars;
 
         const wrongContainer = document.getElementById('spk-wrong-container');
         const reviewBtn = document.getElementById('spk-review-btn');
         
+        // 📊 繪製每一個單字的評分成績單
+        let html = `<div class="wrong-list"><strong>📋 每個單字發音成績：</strong><ul style="padding-left:0; margin-top:8px;">`;
+        speakingScoreLogs.forEach(log => {
+            const tagClass = log.isPass ? "score-pass" : "score-fail";
+            const tagText = log.isPass ? `${log.score}分 (通過)` : `${log.score}分 (需補強)`;
+            html += `
+                <li class="wrong-item">
+                    <span>${log.item.word} (${log.item.meaning})</span>
+                    <span class="score-tag ${tagClass}">${tagText}</span>
+                </li>`;
+        });
+        html += `</ul></div>`;
+        wrongContainer.innerHTML = html;
+
+        // 如果有未達標（低於 90 分）的單字，顯示修正按鈕
         if (wrongWords.length > 0) {
-            let html = `<div class="wrong-list"><strong>發音需加強的單字：</strong><ul>`;
-            wrongWords.forEach(w => {
-                html += `<li class="wrong-item">${w.word} - ${w.meaning}</li>`;
-            });
-            html += `</ul></div>`;
-            wrongContainer.innerHTML = html;
             reviewBtn.style.display = 'flex';
         } else {
-            wrongContainer.innerHTML = `<p style="color:#10b981; font-weight:bold; font-size:1.1rem; margin-top:10px;">發音大師！全對過關！🎉</p>`;
             reviewBtn.style.display = 'none';
         }
     }
 
-    // 🚀 安全確保：當頁面 DOM 載入完成時，一定強制初始化選單
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initUnitSelector);
     } else {

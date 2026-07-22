@@ -491,6 +491,31 @@
     let score = 0;
     let wrongWords = [];
 
+    // 📱 手機端音訊解鎖機制
+    let audioUnlocked = false;
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        
+        // 播放微小的無音音檔解鎖 HTML5 Audio
+        const silentAudio = new Audio();
+        silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+        silentAudio.play().then(() => {
+            audioUnlocked = true;
+        }).catch(() => {});
+
+        // 解鎖 TTS 語音
+        if ('speechSynthesis' in window) {
+            const emptyUtterance = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(emptyUtterance);
+        }
+
+        // 綁定後即可移除解鎖監聽
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('click', unlockAudio);
+    }
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+
     function initUnitSelector() {
         const selectEl = document.getElementById('unitSelect');
         selectEl.innerHTML = "";
@@ -508,6 +533,7 @@
     }
 
     function onUnitChange() {
+        unlockAudio();
         const selectEl = document.getElementById('unitSelect');
         currentUnitKey = selectEl.value;
         activeWordList = courseData[currentUnitKey];
@@ -519,6 +545,7 @@
     }
 
     function switchMode(mode) {
+        unlockAudio();
         currentMode = mode;
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.mode-section').forEach(sec => sec.classList.remove('active'));
@@ -539,6 +566,7 @@
     }
 
     function playAudio(item) {
+        unlockAudio();
         if (item && item.audio) {
             const audio = new Audio(item.audio);
             audio.play().catch(() => speakText(item.word));
@@ -565,12 +593,15 @@
         document.getElementById('fc-phonics').innerText = item.phonics;
         document.getElementById('fc-meaning').innerText = item.meaning;
     }
+    
     function playCurrentWordAudio() { playAudio(activeWordList[currentIndex]); }
+    
     function nextWord() {
         currentIndex = (currentIndex + 1) % activeWordList.length;
         updateFlashcard();
         playCurrentWordAudio();
     }
+    
     function prevWord() {
         currentIndex = (currentIndex - 1 + activeWordList.length) % activeWordList.length;
         updateFlashcard();
@@ -630,7 +661,10 @@
             optionsContainer.appendChild(btn);
         });
 
-        playQuizAudio();
+        // 如果手機端已經完成解鎖，才自動發聲；否則等待點擊發聲按鈕
+        if (audioUnlocked) {
+            playQuizAudio();
+        }
     }
 
     function playQuizAudio() { playAudio(currentQuizList[quizIndex]); }
@@ -769,6 +803,7 @@
     }
 
     function startSpeechRecognition() {
+        unlockAudio();
         if (recognition) recognition.start();
         else alert("您的瀏覽器不支援麥克風語音辨識，請使用 Chrome / Edge。");
     }

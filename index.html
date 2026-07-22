@@ -496,20 +496,17 @@
     function unlockAudio() {
         if (audioUnlocked) return;
         
-        // 播放微小的無音音檔解鎖 HTML5 Audio
         const silentAudio = new Audio();
         silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
         silentAudio.play().then(() => {
             audioUnlocked = true;
         }).catch(() => {});
 
-        // 解鎖 TTS 語音
         if ('speechSynthesis' in window) {
             const emptyUtterance = new SpeechSynthesisUtterance("");
             window.speechSynthesis.speak(emptyUtterance);
         }
 
-        // 綁定後即可移除解鎖監聽
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('click', unlockAudio);
     }
@@ -661,7 +658,6 @@
             optionsContainer.appendChild(btn);
         });
 
-        // 如果手機端已經完成解鎖，才自動發聲；否則等待點擊發聲按鈕
         if (audioUnlocked) {
             playQuizAudio();
         }
@@ -722,7 +718,126 @@
         }
     }
 
-    // === 3. 口說測驗邏輯 ===
+    // === 3. 口說測驗邏輯 (防延遲/防當機優化版) ===
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isRecognizing = false;
+    let recognitionTimeout = null;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.continuous = false;     // 單次辨識，降低資源占用
+        recognition.interimResults = false; // 僅取最終結果
+
+        recognition.onstart = function() {
+            isRecognizing = true;
+            const micBtn = document.getElementById('mic-btn');
+            micBtn.innerText = "🎙️ 聆聽中...請清楚朗讀";
+            micBtn.style.opacity = "0.7";
+            document.getElementById('speaking-feedback').innerHTML = "";
+
+            // 防卡死超時保護 (6 秒無回應自動關閉)
+            clearTimeout(recognitionTimeout);
+            recognitionTimeout = setTimeout(() => {
+                if (isRecognizing) {
+                    stopRecognition();
+                    const feedback = document.getElementById('speaking-feedback');
+                    feedback.className = "feedback-box incorrect";
+                    feedback.innerHTML = "⏱️ 沒有聽到聲音，請再試一次喔！";
+                }
+            }, 6000);
+        };
+
+        recognition.onspeechend = function() {
+            stopRecognition();
+        };
+
+        recognition.onresult = function(event) {
+            clearTimeout(recognitionTimeout);
+            stopRecognition();
+
+            if (!event.results || !event.results[0]) return;
+
+            const spoken = event.results[0][0].transcript.toLowerCase().trim().replace(/[.,?!]/g, "");
+            const current = currentQuizList[quizIndex];
+            const target = current.word.toLowerCase();
+            const feedback = document.getElementById('speaking-feedback');
+
+            if (spoken === target) {
+                score++;
+                feedback.className = "feedback-box correct";
+                feedback.innerHTML = `🎉 發音標準！<br><small>聽到：${spoken}</small>`;
+                setTimeout(() => {
+                    quizIndex++;
+                    loadSpeakingQuestion();
+                }, 1200);
+            } else {
+                if (!wrongWords.includes(current)) wrongWords.push(current);
+                feedback.className = "feedback-box incorrect";
+                feedback.innerHTML = `
+                    <div>❌ 發音不太對喔！聽到：<b>${spoken}</b></div>
+                    <button class="btn btn-outline" style="margin-top:5px; padding:4px 10px; font-size:0.85rem;" onclick="playAudio(currentQuizList[quizIndex])">🔊 聽正確示範</button>
+                `;
+                setTimeout(() => {
+                    quizIndex++;
+                    loadSpeakingQuestion();
+                }, 2200);
+            }
+        };
+
+        recognition.onerror = function(event) {
+            clearTimeout(recognitionTimeout);
+            stopRecognition();
+            console.warn("語音辨識錯誤:", event.error);
+            
+            const feedback = document.getElementById('speaking-feedback');
+            if (event.error === 'not-allowed') {
+                alert("請允許瀏覽器存取麥克風權限！");
+            } else if (event.error !== 'no-speech') {
+                feedback.className = "feedback-box incorrect";
+                feedback.innerHTML = "⚠️ 辨識微卡頓，請再點擊一次麥克風";
+            }
+        };
+    }
+
+    function stopRecognition() {
+        isRecognizing = false;
+        clearTimeout(recognitionTimeout);
+        const micBtn = document.getElementById('mic-btn');
+        if (micBtn) {
+            micBtn.innerText = "🎙️ 按下開始唸單字";
+            micBtn.style.opacity = "1";
+        }
+        if (recognition) {
+            try { recognition.stop(); } catch(e) {}
+        }
+    }
+
+    function startSpeechRecognition() {
+        unlockAudio();
+        
+        if (!recognition) {
+            alert("您的瀏覽器不支援麥克風語音辨識，請使用 Chrome / Edge / Safari。");
+            return;
+        }
+
+        if (isRecognizing) {
+            stopRecognition();
+            return;
+        }
+
+        try {
+            recognition.abort();
+            setTimeout(() => {
+                recognition.start();
+            }, 100);
+        } catch (e) {
+            console.error("啟動辨識失敗:", e);
+            stopRecognition();
+        }
+    }
+
     function restartSpeakingQuiz() {
         currentQuizList = [...activeWordList].sort(() => 0.5 - Math.random());
         startSpeakingQuiz();
@@ -754,58 +869,6 @@
         document.getElementById('sp-meaning').innerText = item.meaning;
         document.getElementById('speaking-feedback').className = "feedback-box";
         document.getElementById('speaking-feedback').innerHTML = "";
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition;
-
-    if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        
-        recognition.onstart = function() {
-            document.getElementById('mic-btn').innerText = "🎙️ 聆聽中...請清楚朗讀";
-            document.getElementById('speaking-feedback').innerHTML = "";
-        };
-
-        recognition.onspeechend = function() {
-            recognition.stop();
-            document.getElementById('mic-btn').innerText = "🎙️ 按下開始唸單字";
-        };
-
-        recognition.onresult = function(event) {
-            const spoken = event.results[0][0].transcript.toLowerCase().trim().replace(/[.,?!]/g, "");
-            const current = currentQuizList[quizIndex];
-            const target = current.word.toLowerCase();
-            const feedback = document.getElementById('speaking-feedback');
-
-            if (spoken === target) {
-                score++;
-                feedback.className = "feedback-box correct";
-                feedback.innerHTML = `🎉 發音標準！<br><small>聽到：${spoken}</small>`;
-                setTimeout(() => {
-                    quizIndex++;
-                    loadSpeakingQuestion();
-                }, 1200);
-            } else {
-                if (!wrongWords.includes(current)) wrongWords.push(current);
-                feedback.className = "feedback-box incorrect";
-                feedback.innerHTML = `
-                    <div>❌ 發音不太對喔！聽到：<b>${spoken}</b></div>
-                    <button class="btn btn-outline" style="margin-top:5px; padding:4px 10px; font-size:0.85rem;" onclick="playAudio(currentQuizList[quizIndex])">🔊 聽正確示範</button>
-                `;
-                setTimeout(() => {
-                    quizIndex++;
-                    loadSpeakingQuestion();
-                }, 2200);
-            }
-        };
-    }
-
-    function startSpeechRecognition() {
-        unlockAudio();
-        if (recognition) recognition.start();
-        else alert("您的瀏覽器不支援麥克風語音辨識，請使用 Chrome / Edge。");
     }
 
     function showSpeakingResult() {

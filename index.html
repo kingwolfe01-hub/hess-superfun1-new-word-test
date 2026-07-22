@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Super Fun 1 單字學習方程式</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 📱 9:16 模擬手機容器 */
+        .app-viewport {
+            width: 100%;
+            max-width: 430px;
+            height: 100vh;
+            max-height: 932px;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        @media (min-width: 440px) {
+            .app-viewport {
+                height: 92vh;
+                border-radius: 40px;
+                border: 8px solid #334155;
+            }
+        }
+
+        /* 頂部 Header */
+        .app-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+            z-index: 10;
+        }
+
+        .app-title {
+            margin: 0 0 10px 0;
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        .select-input {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            border-radius: 12px;
+            border: none;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: 600;
+            outline: none;
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+        }
+
+        .select-input option {
+            background-color: #1e1b4b;
+            color: white;
+        }
+
+        /* 導覽頁籤 Nav Tabs */
+        .nav-tabs {
+            display: flex;
+            background: #f1f5f9;
+            padding: 6px;
+            margin: 12px 16px 0 16px;
+            border-radius: 16px;
+            gap: 6px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 0;
+            border: none;
+            border-radius: 12px;
+            background: transparent;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #4f46e5;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+        }
+
+        /* 主內容區塊 */
+        .content-area {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .mode-section {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .mode-section.active {
+            display: flex;
+        }
+
+        .card-box {
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            border: 2px solid #f1f5f9;
+            flex: 1;
+            margin-bottom: 16px;
+            position: relative;
+        }
+
+        .word-img {
+            width: 160px;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+            background-color: #f8fafc;
+        }
+
+        .word-text {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.5px;
+        }
+
+        .phonics-text {
+            font-size: 1.1rem;
+            color: #64748b;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .meaning-text {
+            font-size: 1.3rem;
+            color: #4f46e5;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 18px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-outline {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            color: #475569;
+        }
+
+        /* 🖼️ 聽力圖片選項 */
+        .options-grid-img {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            width: 100%;
+        }
+
+        .option-img-btn {
+            padding: 10px;
+            border: 3px solid #e2e8f0;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        }
+
+        .option-img-btn:active {
+            border-color: #6366f1;
+            transform: scale(0.95);
+        }
+
+        .option-img-btn img {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 12px;
+        }
+
+        .feedback-box {
+            min-height: 60px;
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 16px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .correct { color: #047857; background-color: #d1fae5; }
+        .incorrect { color: #b91c1c; background-color: #fee2e2; }
+
+        .progress-badge {
+            background: #e0e7ff;
+            color: #4338ca;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        .score-stars { font-size: 3rem; margin: 15px 0; }
+        .wrong-list { text-align: left; background: #f8fafc; padding: 15px; border-radius: 16px; margin-top: 15px; width: 100%; }
+        .wrong-item { margin-bottom: 6px; color: #ef4444; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="app-viewport">
+    <div class="app-header">
+        <h1 class="app-title">Super Fun 1 單字學習方程式</h1>
+        <select id="unitSelect" class="select-input" onchange="onUnitChange()">
+            </select>
+    </div>
+
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchMode('flashcard')">⚡ 閃示卡</button>
+        <button class="tab-btn" onclick="switchMode('listening')">👂 聽力測驗</button>
+        <button class="tab-btn" onclick="switchMode('speaking')">🎙️ 口說測驗</button>
+    </div>
+
+    <div class="content-area">
+        <div id="flashcard-mode" class="mode-section active">
+            <div class="card-box">
+                <img id="fc-img" class="word-img" src="" alt="單字圖片" onerror="this.src='https://via.placeholder.com/160?text=No+Image'">
+                <div class="word-text" id="fc-word">-</div>
+                <div class="phonics-text" id="fc-phonics">-</div>
+                <div class="meaning-text" id="fc-meaning">-</div>
+            </div>
+            
+            <div>
+                <button class="btn btn-primary" style="margin-bottom: 10px;" onclick="playCurrentWordAudio()">🔊 播放發音</button>
+                <div class="btn-group">
+                    <button class="btn btn-outline" onclick="prevWord()">⬅️ 上一個</button>
+                    <button class="btn btn-outline" onclick="nextWord()">下一個 ➡️</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="listening-mode" class="mode-section">
+            <div id="listening-quiz-view" style="display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
+                <div>
+                    <span class="progress-badge" id="list-progress">題目 1 / 1</span>
+                    <div class="card-box" style="min-height: 120px; flex: none; margin-top: 10px; padding: 15px;">
+                        <button class="btn btn-primary" style="font-size: 1.2rem; padding: 14px 28px;" onclick="playQuizAudio()">🔊 點擊聽發音</button>
+                        <p style="color: #64748b; margin-top: 8px; font-weight: 600; font-size: 0.95rem;">請選出聽到的正確圖片：</p>
+                    </div>
+                </div>
+
+                <div class="options-grid-img" id="quiz-options"></div>
+                <div id="listening-feedback" class="feedback-box"></div>
+            </div>
+            
+            <div id="listening-result-view" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+                <h3>🎉 聽力測驗完成！</h3>
+                <div class="score-stars" id="list-stars">⭐⭐⭐</div>
+                <p id="list-score-text" style="font-size: 1.3rem; font-weight: 800; color: #1e293b;"></p>
+                <div id="list-wrong-container" style="width: 100%;"></div>
+                <button class="btn btn-primary" style="margin-top: 15px;" onclick="restartListeningQuiz()">🔄 重新測驗</button>
+                <button class="btn btn-warning" id="list-review-btn" style="display: none; margin-top: 10px;" onclick="startListeningReview()">✏️ 針對錯題做練習</button>
+            </div>
+        </div>
+
+        <div id="speaking-mode" class="mode-section">
+            <div id="speaking-quiz-view" style="display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
+                <div>
+                    <span class="progress-badge" id="spk-progress">題目 1 / 1</span>
+                    <div class="card-box" style="margin-top: 10px;">
+                        <img id="sp-img" class="word-img" src="" alt="單字圖片" onerror="this.src='https://via.placeholder.com/160?text=No+Image'">
+                        <div class="word-text" id="sp-word">-</div>
+                        <div class="phonics-text" id="sp-phonics">-</div>
+                        <div class="meaning-text" id="sp-meaning">-</div>
+                    </div>
+                </div>
+
+                <div>
+                    <button class="btn btn-success" id="mic-btn" onclick="startSpeechRecognition()">🎙️ 按下開始唸單字</button>
+                    <div id="speaking-feedback" class="feedback-box"></div>
+                </div>
+            </div>
+
+            <div id="speaking-result-view" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+                <h3>🎉 口說測驗完成！</h3>
+                <div class="score-stars" id="spk-stars">⭐⭐⭐</div>
+                <p id="spk-score-text" style="font-size: 1.3rem; font-weight: 800; color: #1e293b;"></p>
+                <div id="spk-wrong-container" style="width: 100%;"></div>
+                <button class="btn btn-primary" style="margin-top: 15px;" onclick="restartSpeakingQuiz()">🔄 重新測驗</button>
+                <button class="btn btn-warning" id="spk-review-btn" style="display: none; margin-top: 10px;" onclick="startSpeakingReview()">✏️ 針對錯題做練習</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // === Super Fun 1 基礎單元資料庫 ===
+    const rawUnits = {
+        "🔢 Numbers 數字 1-10": [
+            { word: "one", phonics: "[ wʌn ]", meaning: "一", image: "assets/images/b1/one.png", audio: "assets/audio/b1/one.mp3" },
+            { word: "two", phonics: "[ tuː ]", meaning: "二", image: "assets/images/b1/two.png", audio: "assets/audio/b1/two.mp3" },
+            { word: "three", phonics: "[ θriː ]", meaning: "三", image: "assets/images/b1/three.png", audio: "assets/audio/b1/three.mp3" },
+            { word: "four", phonics: "[ fɔːr ]", meaning: "四", image: "assets/images/b1/four.png", audio: "assets/audio/b1/four.mp3" },
+            { word: "five", phonics: "[ faɪv ]", meaning: "五", image: "assets/images/b1/five.png", audio: "assets/audio/b1/five.mp3" },
+            { word: "six", phonics: "[ sɪks ]", meaning: "六", image: "assets/images/b1/six.png", audio: "assets/audio/b1/six.mp3" },
+            { word: "seven", phonics: "[ ˈsevn ]", meaning: "七", image: "assets/images/b1/seven.png", audio: "assets/audio/b1/seven.mp3" },
+            { word: "eight", phonics: "[ eɪt ]", meaning: "八", image: "assets/images/b1/eight.png", audio: "assets/audio/b1/eight.mp3" },
+            { word: "nine", phonics: "[ naɪn ]", meaning: "九", image: "assets/images/b1/nine.png", audio: "assets/audio/b1/nine.mp3" },
+            { word: "ten", phonics: "[ ten ]", meaning: "十", image: "assets/images/b1/ten.png", audio: "assets/audio/b1/ten.mp3" }
+        ],
+        "Phonics 1 (A-F)": [
+            { word: "ant", phonics: "[ ænt ]", meaning: "螞蟻", image: "assets/images/b1/ant.png", audio: "assets/audio/b1/ant.mp3" },
+            { word: "bag", phonics: "[ bæɡ ]", meaning: "袋子", image: "assets/images/b1/bag.png", audio: "assets/audio/b1/bag.mp3" },
+            { word: "cat", phonics: "[ kæt ]", meaning: "貓咪", image: "assets/images/b1/cat.png", audio: "assets/audio/b1/cat.mp3" },
+            { word: "dog", phonics: "[ dɔːɡ ]", meaning: "狗", image: "assets/images/b1/dog.png", audio: "assets/audio/b1/dog.mp3" },
+            { word: "egg", phonics: "[ eɡ ]", meaning: "蛋", image: "assets/images/b1/egg.png", audio: "assets/audio/b1/egg.mp3" },
+            { word: "fish", phonics: "[ fɪʃ ]", meaning: "魚", image: "assets/images/b1/fish.png", audio: "assets/audio/b1/fish.mp3" }
+        ],
+        "Phonics 2 (G-M)": [
+            { word: "girl", phonics: "[ ɡɜːrl ]", meaning: "女孩", image: "assets/images/b1/girl.png", audio: "assets/audio/b1/girl.mp3" },
+            { word: "hat", phonics: "[ hæt ]", meaning: "帽子", image: "assets/images/b1/hat.png", audio: "assets/audio/b1/hat.mp3" },
+            { word: "insect", phonics: "[ ˈɪnsekt ]", meaning: "昆蟲", image: "assets/images/b1/insect.png", audio: "assets/audio/b1/insect.mp3" },
+            { word: "jet", phonics: "[ dʒet ]", meaning: "噴射機", image: "assets/images/b1/jet.png", audio: "assets/audio/b1/jet.mp3" },
+            { word: "kite", phonics: "[ kaɪt ]", meaning: "風箏", image: "assets/images/b1/kite.png", audio: "assets/audio/b1/kite.mp3" },
+            { word: "lion", phonics: "[ ˈlaɪən ]", meaning: "獅子", image: "assets/images/b1/lion.png", audio: "assets/audio/b1/lion.mp3" },
+            { word: "monkey", phonics: "[ ˈmʌŋki ]", meaning: "猴子", image: "assets/images/b1/monkey.png", audio: "assets/audio/b1/monkey.mp3" }
+        ],
+        "Phonics 3 (N-R, Six)": [
+            { word: "nose", phonics: "[ noʊz ]", meaning: "鼻子", image: "assets/images/b1/nose.png", audio: "assets/audio/b1/nose.mp3" },
+            { word: "ox", phonics: "[ ɑːks ]", meaning: "公牛", image: "assets/images/b1/ox.png", audio: "assets/audio/b1/ox.mp3" },
+            { word: "pig", phonics: "[ pɪɡ ]", meaning: "豬", image: "assets/images/b1/pig.png", audio: "assets/audio/b1/pig.mp3" },
+            { word: "queen", phonics: "[ kwiːn ]", meaning: "女王", image: "assets/images/b1/queen.png", audio: "assets/audio/b1/queen.mp3" },
+            { word: "rabbit", phonics: "[ ˈræbɪt ]", meaning: "兔子", image: "assets/images/b1/rabbit.png", audio: "assets/audio/b1/rabbit.mp3" },
+            { word: "six", phonics: "[ sɪks ]", meaning: "六", image: "assets/images/b1/six.png", audio: "assets/audio/b1/six.mp3" }
+        ],
+        "Phonics 4 (T-Z)": [
+            { word: "ten", phonics: "[ ten ]", meaning: "十", image: "assets/images/b1/ten.png", audio: "assets/audio/b1/ten.mp3" },
+            { word: "up", phonics: "[ ʌp ]", meaning: "向上", image: "assets/images/b1/up.png", audio: "assets/audio/b1/up.mp3" },
+            { word: "vest", phonics: "[ vest ]", meaning: "背心", image: "assets/images/b1/vest.png", audio: "assets/audio/b1/vest.mp3" },
+            { word: "window", phonics: "[ ˈwɪndoʊ ]", meaning: "窗戶", image: "assets/images/b1/window.png", audio: "assets/audio/b1/window.mp3" },
+            { word: "fox", phonics: "[ fɑːks ]", meaning: "狐狸", image: "assets/images/b1/fox.png", audio: "assets/audio/b1/fox.mp3" },
+            { word: "yo-yo", phonics: "[ ˈjoʊ joʊ ]", meaning: "溜溜球", image: "assets/images/b1/yo-yo.png", audio: "assets/audio/b1/yo-yo.mp3" },
+            { word: "zebra", phonics: "[ ˈziːbrə ]", meaning: "斑馬", image: "assets/images/b1/zebra.png", audio: "assets/audio/b1/zebra.mp3" }
+        ],
+        "Topic 1 - Lesson 1: Name & Friends": [
+            { word: "what", phonics: "[ wɑːt ]", meaning: "什麼", image: "assets/images/b1/what.png", audio: "assets/audio/b1/what.mp3" },
+            { word: "your", phonics: "[ jʊr ]", meaning: "你的", image: "assets/images/b1/your.png", audio: "assets/audio/b1/your.mp3" },
+            { word: "name", phonics: "[ neɪm ]", meaning: "名字", image: "assets/images/b1/name.png", audio: "assets/audio/b1/name.mp3" },
+            { word: "my", phonics: "[ maɪ ]", meaning: "我的", image: "assets/images/b1/my.png", audio: "assets/audio/b1/my.mp3" },
+            { word: "Ken", phonics: "[ ken ]", meaning: "Ken (肯)", image: "assets/images/b1/ken.png", audio: "assets/audio/b1/ken.mp3" },
+            { word: "Emma", phonics: "[ ˈemə ]", meaning: "Emma (艾瑪)", image: "assets/images/b1/emma.png", audio: "assets/audio/b1/emma.mp3" },
+            { word: "Mike", phonics: "[ maɪk ]", meaning: "Mike (麥克)", image: "assets/images/b1/mike.png", audio: "assets/audio/b1/mike.mp3" },
+            { word: "Wendy", phonics: "[ ˈwendi ]", meaning: "Wendy (溫蒂)", image: "assets/images/b1/wendy.png", audio: "assets/audio/b1/wendy.mp3" },
+            { word: "Alan", phonics: "[ ˈælən ]", meaning: "Alan (艾倫)", image: "assets/images/b1/alan.png", audio: "assets/audio/b1/alan.mp3" }
+        ],
+        "Topic 1 - Lesson 2: Age": [
+            { word: "how old", phonics: "[ haʊ oʊld ]", meaning: "幾歲", image: "assets/images/b1/how_old.png", audio: "assets/audio/b1/how_old.mp3" },
+            { word: "years old", phonics: "[ jɪrz oʊld ]", meaning: "歲", image: "assets/images/b1/years_old.png", audio: "assets/audio/b1/years_old.mp3" }
+        ],
+        "Topic 2 - Lesson 3: Appearance": [
+            { word: "he", phonics: "[ hiː ]", meaning: "他", image: "assets/images/b1/he.png", audio: "assets/audio/b1/he.mp3" },
+            { word: "she", phonics: "[ ʃiː ]", meaning: "她", image: "assets/images/b1/she.png", audio: "assets/audio/b1/she.mp3" },
+            { word: "strong", phonics: "[ strɔːŋ ]", meaning: "強壯的", image: "assets/images/b1/strong.png", audio: "assets/audio/b1/strong.mp3" },
+            { word: "thin", phonics: "[ θɪn ]", meaning: "瘦的", image: "assets/images/b1/thin.png", audio: "assets/audio/b1/thin.png" },
+            { word: "short", phonics: "[ ʃɔːrt ]", meaning: "矮的", image: "assets/images/b1/short.png", audio: "assets/audio/b1/short.mp3" },
+            { word: "tall", phonics: "[ tɔːl ]", meaning: "高的", image: "assets/images/b1/tall.png", audio: "assets/audio/b1/tall.mp3" }
+        ],
+        "Topic 2 - Lesson 4: Feelings": [
+            { word: "tired", phonics: "[ ˈtaɪərd ]", meaning: "疲累的", image: "assets/images/b1/tired.png", audio: "assets/audio/b1/tired.mp3" },
+            { word: "angry", phonics: "[ ˈæŋɡri ]", meaning: "生氣的", image: "assets/images/b1/angry.png", audio: "assets/audio/b1/angry.mp3" },
+            { word: "happy", phonics: "[ ˈhæpi ]", meaning: "快樂的", image: "assets/images/b1/happy.png", audio: "assets/audio/b1/happy.mp3" },
+            { word: "sad", phonics: "[ sæd ]", meaning: "難過的", image: "assets/images/b1/sad.png", audio: "assets/audio/b1/sad.mp3" },
+            { word: "yes", phonics: "[ jes ]", meaning: "是的", image: "assets/images/b1/yes.png", audio: "assets/audio/b1/yes.mp3" },
+            { word: "no", phonics: "[ noʊ ]", meaning: "不", image: "assets/images/b1/no.png", audio: "assets/audio/b1/no.mp3" }
+        ],
+        "Festival: Christmas": [
+            { word: "Christmas tree", phonics: "[ ˈkrɪsməs triː ]", meaning: "耶誕樹", image: "assets/images/b1/christmas_tree.png", audio: "assets/audio/b1/christmas_tree.mp3" },
+            { word: "stocking", phonics: "[ ˈstɑːkɪŋ ]", meaning: "長襪", image: "assets/images/b1/stocking.png", audio: "assets/audio/b1/stocking.mp3" },
+            { word: "gift", phonics: "[ ɡɪft ]", meaning: "禮物", image: "assets/images/b1/gift.png", audio: "assets/audio/b1/gift.mp3" },
+            { word: "Santa Claus", phonics: "[ ˈsæntə klɔːz ]", meaning: "耶誕老人", image: "assets/images/b1/santa_claus.png", audio: "assets/audio/b1/santa_claus.mp3" }
+        ]
+    };
+
+    const courseData = {
+        ...rawUnits,
+        "📝 【期中考範圍】 Midterm Exam": [
+            ...rawUnits["🔢 Numbers 數字 1-10"],
+            ...rawUnits["Phonics 1 (A-F)"],
+            ...rawUnits["Phonics 2 (G-M)"],
+            ...rawUnits["Topic 1 - Lesson 1: Name & Friends"],
+            ...rawUnits["Topic 1 - Lesson 2: Age"]
+        ],
+        "📝 【期末考範圍】 Final Exam": [
+            ...rawUnits["Phonics 3 (N-R, Six)"],
+            ...rawUnits["Phonics 4 (T-Z)"],
+            ...rawUnits["Topic 2 - Lesson 3: Appearance"],
+            ...rawUnits["Topic 2 - Lesson 4: Feelings"],
+            ...rawUnits["Festival: Christmas"]
+        ],
+        "🏆 【全冊總複習】 Book 1 Review": Object.values(rawUnits).flat()
+    };
+
+    let currentUnitKey = "";
+    let activeWordList = [];
+    let currentIndex = 0;
+    let currentMode = "flashcard";
+
+    let currentQuizList = [];
+    let quizIndex = 0;
+    let score = 0;
+    let wrongWords = [];
+
+    function initUnitSelector() {
+        const selectEl = document.getElementById('unitSelect');
+        selectEl.innerHTML = "";
+        
+        Object.keys(courseData).forEach(unitKey => {
+            const option = document.createElement('option');
+            option.value = unitKey;
+            option.innerText = unitKey;
+            selectEl.appendChild(option);
+        });
+
+        currentUnitKey = Object.keys(courseData)[0];
+        activeWordList = courseData[currentUnitKey];
+        updateFlashcard();
+    }
+
+    function onUnitChange() {
+        const selectEl = document.getElementById('unitSelect');
+        currentUnitKey = selectEl.value;
+        activeWordList = courseData[currentUnitKey];
+        currentIndex = 0;
+
+        if (currentMode === 'flashcard') updateFlashcard();
+        else if (currentMode === 'listening') restartListeningQuiz();
+        else if (currentMode === 'speaking') restartSpeakingQuiz();
+    }
+
+    function switchMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.mode-section').forEach(sec => sec.classList.remove('active'));
+
+        if (mode === 'flashcard') {
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            document.getElementById('flashcard-mode').classList.add('active');
+            updateFlashcard();
+        } else if (mode === 'listening') {
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            document.getElementById('listening-mode').classList.add('active');
+            restartListeningQuiz();
+        } else if (mode === 'speaking') {
+            document.querySelectorAll('.tab-btn')[2].classList.add('active');
+            document.getElementById('speaking-mode').classList.add('active');
+            restartSpeakingQuiz();
+        }
+    }
+
+    function playAudio(item) {
+        if (item && item.audio) {
+            const audio = new Audio(item.audio);
+            audio.play().catch(() => speakText(item.word));
+        } else if (item) {
+            speakText(item.word);
+        }
+    }
+
+    function speakText(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.85;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    function updateFlashcard() {
+        if (!activeWordList || activeWordList.length === 0) return;
+        const item = activeWordList[currentIndex];
+        document.getElementById('fc-img').src = item.image;
+        document.getElementById('fc-word').innerText = item.word;
+        document.getElementById('fc-phonics').innerText = item.phonics;
+        document.getElementById('fc-meaning').innerText = item.meaning;
+    }
+    function playCurrentWordAudio() { playAudio(activeWordList[currentIndex]); }
+    function nextWord() {
+        currentIndex = (currentIndex + 1) % activeWordList.length;
+        updateFlashcard();
+        playCurrentWordAudio();
+    }
+    function prevWord() {
+        currentIndex = (currentIndex - 1 + activeWordList.length) % activeWordList.length;
+        updateFlashcard();
+        playCurrentWordAudio();
+    }
+
+    // === 2. 聽力測驗邏輯 ===
+    function restartListeningQuiz() {
+        currentQuizList = [...activeWordList].sort(() => 0.5 - Math.random());
+        startListeningQuiz();
+    }
+    function startListeningReview() {
+        currentQuizList = [...wrongWords].sort(() => 0.5 - Math.random());
+        startListeningQuiz();
+    }
+    function startListeningQuiz() {
+        quizIndex = 0;
+        score = 0;
+        wrongWords = [];
+        document.getElementById('listening-quiz-view').style.display = 'flex';
+        document.getElementById('listening-result-view').style.display = 'none';
+        loadListeningQuestion();
+    }
+
+    function loadListeningQuestion() {
+        if (quizIndex >= currentQuizList.length) {
+            showListeningResult();
+            return;
+        }
+
+        document.getElementById('list-progress').innerText = `題目 ${quizIndex + 1} / ${currentQuizList.length}`;
+        document.getElementById('listening-feedback').className = "feedback-box";
+        document.getElementById('listening-feedback').innerHTML = "";
+
+        const current = currentQuizList[quizIndex];
+        let allWords = Object.values(rawUnits).flat();
+        let options = [current];
+        
+        while (options.length < Math.min(4, allWords.length)) {
+            let rand = allWords[Math.floor(Math.random() * allWords.length)];
+            if (!options.some(o => o.word === rand.word)) options.push(rand);
+        }
+        options.sort(() => 0.5 - Math.random());
+        
+        const optionsContainer = document.getElementById('quiz-options');
+        optionsContainer.innerHTML = "";
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-img-btn';
+            
+            const img = document.createElement('img');
+            img.src = opt.image;
+            img.onerror = function() { this.src = 'https://via.placeholder.com/120?text=' + opt.word; };
+            
+            btn.appendChild(img);
+            btn.onclick = () => checkListeningAnswer(opt, current);
+            optionsContainer.appendChild(btn);
+        });
+
+        playQuizAudio();
+    }
+
+    function playQuizAudio() { playAudio(currentQuizList[quizIndex]); }
+
+    function checkListeningAnswer(selected, correct) {
+        const feedback = document.getElementById('listening-feedback');
+        if (selected.word === correct.word) {
+            score++;
+            feedback.className = "feedback-box correct";
+            feedback.innerHTML = "🎉 答對了！非常棒！";
+            setTimeout(() => {
+                quizIndex++;
+                loadListeningQuestion();
+            }, 1200);
+        } else {
+            if (!wrongWords.includes(correct)) wrongWords.push(correct);
+            feedback.className = "feedback-box incorrect";
+            feedback.innerHTML = `
+                <div>❌ 答錯囉！正確答案是：<strong>${correct.word}</strong> (${correct.meaning})</div>
+                <button class="btn btn-outline" style="margin-top:5px; padding:4px 10px; font-size:0.85rem;" onclick="playAudio(currentQuizList[quizIndex])">🔊 聽正確發音</button>
+            `;
+            setTimeout(() => {
+                quizIndex++;
+                loadListeningQuestion();
+            }, 2200);
+        }
+    }
+
+    function showListeningResult() {
+        document.getElementById('listening-quiz-view').style.display = 'none';
+        document.getElementById('listening-result-view').style.display = 'flex';
+        
+        const percentage = Math.round((score / currentQuizList.length) * 100);
+        document.getElementById('list-score-text').innerText = `得分：${score} / ${currentQuizList.length} (${percentage}分)`;
+        
+        let stars = "⭐";
+        if (percentage >= 80) stars = "⭐⭐⭐";
+        else if (percentage >= 60) stars = "⭐⭐";
+        document.getElementById('list-stars').innerText = stars;
+
+        const wrongContainer = document.getElementById('list-wrong-container');
+        const reviewBtn = document.getElementById('list-review-btn');
+        
+        if (wrongWords.length > 0) {
+            let html = `<div class="wrong-list"><strong>需要加強的單字：</strong><ul>`;
+            wrongWords.forEach(w => {
+                html += `<li class="wrong-item">${w.word} - ${w.meaning}</li>`;
+            });
+            html += `</ul></div>`;
+            wrongContainer.innerHTML = html;
+            reviewBtn.style.display = 'flex';
+        } else {
+            wrongContainer.innerHTML = `<p style="color:#10b981; font-weight:bold; font-size:1.1rem; margin-top:10px;">預祝考試拿滿分！🎉</p>`;
+            reviewBtn.style.display = 'none';
+        }
+    }
+
+    // === 3. 口說測驗邏輯 ===
+    function restartSpeakingQuiz() {
+        currentQuizList = [...activeWordList].sort(() => 0.5 - Math.random());
+        startSpeakingQuiz();
+    }
+    function startSpeakingReview() {
+        currentQuizList = [...wrongWords].sort(() => 0.5 - Math.random());
+        startSpeakingQuiz();
+    }
+    function startSpeakingQuiz() {
+        quizIndex = 0;
+        score = 0;
+        wrongWords = [];
+        document.getElementById('speaking-quiz-view').style.display = 'flex';
+        document.getElementById('speaking-result-view').style.display = 'none';
+        loadSpeakingQuestion();
+    }
+
+    function loadSpeakingQuestion() {
+        if (quizIndex >= currentQuizList.length) {
+            showSpeakingResult();
+            return;
+        }
+
+        document.getElementById('spk-progress').innerText = `題目 ${quizIndex + 1} / ${currentQuizList.length}`;
+        const item = currentQuizList[quizIndex];
+        document.getElementById('sp-img').src = item.image;
+        document.getElementById('sp-word').innerText = item.word;
+        document.getElementById('sp-phonics').innerText = item.phonics;
+        document.getElementById('sp-meaning').innerText = item.meaning;
+        document.getElementById('speaking-feedback').className = "feedback-box";
+        document.getElementById('speaking-feedback').innerHTML = "";
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        
+        recognition.onstart = function() {
+            document.getElementById('mic-btn').innerText = "🎙️ 聆聽中...請清楚朗讀";
+            document.getElementById('speaking-feedback').innerHTML = "";
+        };
+
+        recognition.onspeechend = function() {
+            recognition.stop();
+            document.getElementById('mic-btn').innerText = "🎙️ 按下開始唸單字";
+        };
+
+        recognition.onresult = function(event) {
+            const spoken = event.results[0][0].transcript.toLowerCase().trim().replace(/[.,?!]/g, "");
+            const current = currentQuizList[quizIndex];
+            const target = current.word.toLowerCase();
+            const feedback = document.getElementById('speaking-feedback');
+
+            if (spoken === target) {
+                score++;
+                feedback.className = "feedback-box correct";
+                feedback.innerHTML = `🎉 發音標準！<br><small>聽到：${spoken}</small>`;
+                setTimeout(() => {
+                    quizIndex++;
+                    loadSpeakingQuestion();
+                }, 1200);
+            } else {
+                if (!wrongWords.includes(current)) wrongWords.push(current);
+                feedback.className = "feedback-box incorrect";
+                feedback.innerHTML = `
+                    <div>❌ 發音不太對喔！聽到：<b>${spoken}</b></div>
+                    <button class="btn btn-outline" style="margin-top:5px; padding:4px 10px; font-size:0.85rem;" onclick="playAudio(currentQuizList[quizIndex])">🔊 聽正確示範</button>
+                `;
+                setTimeout(() => {
+                    quizIndex++;
+                    loadSpeakingQuestion();
+                }, 2200);
+            }
+        };
+    }
+
+    function startSpeechRecognition() {
+        if (recognition) recognition.start();
+        else alert("您的瀏覽器不支援麥克風語音辨識，請使用 Chrome / Edge。");
+    }
+
+    function showSpeakingResult() {
+        document.getElementById('speaking-quiz-view').style.display = 'none';
+        document.getElementById('speaking-result-view').style.display = 'flex';
+        
+        const percentage = Math.round((score / currentQuizList.length) * 100);
+        document.getElementById('spk-score-text').innerText = `得分：${score} / ${currentQuizList.length} (${percentage}分)`;
+        
+        let stars = "⭐";
+        if (percentage >= 80) stars = "⭐⭐⭐";
+        else if (percentage >= 60) stars = "⭐⭐";
+        document.getElementById('spk-stars').innerText = stars;
+
+        const wrongContainer = document.getElementById('spk-wrong-container');
+        const reviewBtn = document.getElementById('spk-review-btn');
+        
+        if (wrongWords.length > 0) {
+            let html = `<div class="wrong-list"><strong>發音需加強的單字：</strong><ul>`;
+            wrongWords.forEach(w => {
+                html += `<li class="wrong-item">${w.word} - ${w.meaning}</li>`;
+            });
+            html += `</ul></div>`;
+            wrongContainer.innerHTML = html;
+            reviewBtn.style.display = 'flex';
+        } else {
+            wrongContainer.innerHTML = `<p style="color:#10b981; font-weight:bold; font-size:1.1rem; margin-top:10px;">發音大師！全對過關！🎉</p>`;
+            reviewBtn.style.display = 'none';
+        }
+    }
+
+    initUnitSelector();
+</script>
+
+</body>
+</html>

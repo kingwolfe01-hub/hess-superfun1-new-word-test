@@ -531,6 +531,7 @@
 
     const globalAudioPlayer = new Audio();
     const imageCache = new Map();
+    let audioContext = null;
 
     const isNativePlatform = () => {
         try {
@@ -538,11 +539,6 @@
         } catch(e) {
             return false;
         }
-    };
-
-    const isIOSDevice = () => {
-        return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     };
 
     function safeSetImageSource(imgElement, src) {
@@ -570,6 +566,20 @@
     function unlockAudio() {
         if (audioUnlocked) return;
         try {
+            // iOS Web Audio Context 解鎖（突破靜音切換開關之限制）
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                if (!audioContext) audioContext = new AudioCtx();
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                const buffer = audioContext.createBuffer(1, 1, 22050);
+                const source = audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioContext.destination);
+                source.start(0);
+            }
+
             globalAudioPlayer.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
             const playPromise = globalAudioPlayer.play();
             if (playPromise !== undefined) {
@@ -577,10 +587,6 @@
                     globalAudioPlayer.pause();
                     audioUnlocked = true;
                 }).catch(() => {});
-            }
-
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
             }
         } catch(e) {
             console.warn("Audio unlock warning:", e);
@@ -663,55 +669,54 @@
         }
     }
 
-    async function playAudio(item) {
+    // 修復 iPhone 15 音訊播放邏輯
+    function playAudio(item) {
         if (!item) return;
-
-        // iPhone / iPad Safari 對 HTMLAudioElement 與非同步 fallback 很嚴格。
-        // 只要是 iOS Web 模式，就直接在使用者點擊事件中用 SpeechSynthesis 播放，避免 MP3 載入或播放權限失敗造成無聲。
-        if (!isNativePlatform() && isIOSDevice()) {
-            speakText(item.word);
-            return;
-        }
-
         unlockAudio();
 
         if (item.audio) {
             try {
+                // 停止當前播放
                 globalAudioPlayer.pause();
                 globalAudioPlayer.currentTime = 0;
-                globalAudioPlayer.onerror = () => {
-                    speakText(item.word);
-                };
-                globalAudioPlayer.src = item.audio;
-                
-                const playPromise = globalAudioPlayer.play();
+
+                // 重新建立實例，確保在 iOS Safari 手點擊鏈中能順利觸發音訊
+                const audioInstance = new Audio(item.audio);
+                const playPromise = audioInstance.play();
+
                 if (playPromise !== undefined) {
-                    await playPromise;
+                    playPromise.catch(e => {
+                        console.warn("MP3 播放失敗，切換至 TTS 備援:", e);
+                        speakText(item.word);
+                    });
                 }
             } catch (e) {
-                if (e && e.name !== 'AbortError') {
-                    speakText(item.word);
-                }
+                speakText(item.word);
             }
         } else {
             speakText(item.word);
         }
     }
 
+    // 修正 iOS WebKit 上 cancel() 與 speak() 衝突導致靜音的 Bug
     function speakText(text) {
         if (!text) return;
         if ('speechSynthesis' in window) {
             try {
-                window.speechSynthesis.cancel();
+                // 僅在已有語音播報中時才取消，避免在 iOS 17/18 上預先 cancel 清空即將 speak 的語音
+                if (window.speechSynthesis.speaking) {
+                    window.speechSynthesis.cancel();
+                }
 
-                // iOS Safari 需要在使用者點擊的同步呼叫鏈中直接 speak，避免 setTimeout 造成靜默失敗。
-                const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'en-US';
                 utterance.rate = 0.85;
 
-                const enVoice = voices.find(v => v.lang === 'en-US') || voices.find(v => /^en[-_]/i.test(v.lang));
-                if (enVoice) utterance.voice = enVoice;
+                const voices = window.speechSynthesis.getVoices();
+                if (voices && voices.length > 0) {
+                    const enVoice = voices.find(v => v.lang === 'en-US' || v.lang === 'en_US') || voices.find(v => /^en[-_]/i.test(v.lang));
+                    if (enVoice) utterance.voice = enVoice;
+                }
 
                 window.speechSynthesis.speak(utterance);
             } catch(e) {
@@ -1027,7 +1032,6 @@
         if (feedback) feedback.innerHTML = "";
 
         clearTimeout(recognitionTimeout);
-        // 針對 iOS Safari 延長至 8 秒超時緩衝
         recognitionTimeout = setTimeout(() => {
             if (isRecognizing && !hasProcessedQuestion) {
                 stopRecognition();
@@ -1058,9 +1062,8 @@
         }
     }
 
-    // === iOS Safari & iPhone 15 專屬優化語音啟動 ===
     async function startSpeechRecognition() {
-        // 強制暫停所有播音，釋放 iOS 麥克風音訊通道 (AVAudioSession)
+        // 啟動錄音前釋放所有音訊通道
         if (globalAudioPlayer) {
             try {
                 globalAudioPlayer.pause();
@@ -1119,7 +1122,6 @@
             }
 
             try {
-                // 每次建立全新實例，徹底解決 iOS Safari 重用物件時無音訊串流的 WebKit Bug
                 webSpeechInstance = new SpeechRecognition();
                 webSpeechInstance.lang = 'en-US';
                 webSpeechInstance.continuous = false;

@@ -321,6 +321,9 @@
 </head>
 <body>
 
+<!-- 靜態跨平台 HTML5 音訊播放節點 (突破 iOS 跨域與手勢鏈限制) -->
+<audio id="global-audio-element" playsinline webkit-playsinline preload="auto"></audio>
+
 <div class="app-viewport">
     <div class="app-header">
         <h1 class="app-title">Super Fun 1 單字學習方程式</h1>
@@ -529,9 +532,7 @@
     let wrongWords = [];
     let speakingScoreLogs = [];
 
-    const globalAudioPlayer = new Audio();
     const imageCache = new Map();
-    let audioContext = null;
 
     const isNativePlatform = () => {
         try {
@@ -562,39 +563,31 @@
         });
     }
 
+    // === 💯 全新手勢鏈解鎖 + HTML5 Audio 直接播音引擎 ===
     let audioUnlocked = false;
+
     function unlockAudio() {
         if (audioUnlocked) return;
-        try {
-            // iOS Web Audio Context 解鎖（突破靜音切換開關之限制）
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (AudioCtx) {
-                if (!audioContext) audioContext = new AudioCtx();
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
-                const buffer = audioContext.createBuffer(1, 1, 22050);
-                const source = audioContext.createBufferSource();
-                source.buffer = buffer;
-                source.connect(audioContext.destination);
-                source.start(0);
-            }
-
-            globalAudioPlayer.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
-            const playPromise = globalAudioPlayer.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    globalAudioPlayer.pause();
+        const audioEl = document.getElementById('global-audio-element');
+        if (audioEl) {
+            audioEl.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+            const p = audioEl.play();
+            if (p !== undefined) {
+                p.then(() => {
+                    audioEl.pause();
                     audioUnlocked = true;
                 }).catch(() => {});
             }
-        } catch(e) {
-            console.warn("Audio unlock warning:", e);
+        }
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
         }
 
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('click', unlockAudio);
     }
+
     document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
     document.addEventListener('click', unlockAudio, { once: true, passive: true });
 
@@ -669,25 +662,34 @@
         }
     }
 
-    // 修復 iPhone 15 音訊播放邏輯
+    // === 直連 MP3 音訊播放 (不走 fetch，100% 解決跨域與讀不到檔問題) ===
     function playAudio(item) {
         if (!item) return;
         unlockAudio();
 
-        if (item.audio) {
-            try {
-                // 停止當前播放
-                globalAudioPlayer.pause();
-                globalAudioPlayer.currentTime = 0;
+        const audioEl = document.getElementById('global-audio-element');
 
-                // 重新建立實例，確保在 iOS Safari 手點擊鏈中能順利觸發音訊
-                const audioInstance = new Audio(item.audio);
-                const playPromise = audioInstance.play();
+        if (item.audio && audioEl) {
+            try {
+                audioEl.pause();
+                audioEl.currentTime = 0;
+
+                // 綁定錯誤回呼：若 MP3 檔案不存在（404），自動切換至 SpeechSynthesis 備援
+                audioEl.onerror = () => {
+                    console.warn(`音檔讀取失敗: ${item.audio}，自動切換至 TTS 備援`);
+                    speakText(item.word);
+                };
+
+                audioEl.src = item.audio;
+                const playPromise = audioEl.play();
 
                 if (playPromise !== undefined) {
-                    playPromise.catch(e => {
-                        console.warn("MP3 播放失敗，切換至 TTS 備援:", e);
-                        speakText(item.word);
+                    playPromise.catch((e) => {
+                        // 忽略使用者連續點擊所產生的 AbortError
+                        if (e && e.name !== 'AbortError') {
+                            console.warn("HTML5 Audio 播放失敗，降級至 TTS:", e);
+                            speakText(item.word);
+                        }
                     });
                 }
             } catch (e) {
@@ -698,12 +700,10 @@
         }
     }
 
-    // 修正 iOS WebKit 上 cancel() 與 speak() 衝突導致靜音的 Bug
     function speakText(text) {
         if (!text) return;
         if ('speechSynthesis' in window) {
             try {
-                // 僅在已有語音播報中時才取消，避免在 iOS 17/18 上預先 cancel 清空即將 speak 的語音
                 if (window.speechSynthesis.speaking) {
                     window.speechSynthesis.cancel();
                 }
@@ -1063,12 +1063,10 @@
     }
 
     async function startSpeechRecognition() {
-        // 啟動錄音前釋放所有音訊通道
-        if (globalAudioPlayer) {
-            try {
-                globalAudioPlayer.pause();
-                globalAudioPlayer.currentTime = 0;
-            } catch (e) {}
+        // 啟動錄音前關閉播放器與 TTS 語音
+        const audioEl = document.getElementById('global-audio-element');
+        if (audioEl) {
+            try { audioEl.pause(); } catch(e) {}
         }
         if ('speechSynthesis' in window) {
             try { window.speechSynthesis.cancel(); } catch (e) {}

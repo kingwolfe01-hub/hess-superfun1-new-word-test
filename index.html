@@ -321,9 +321,6 @@
 </head>
 <body>
 
-<!-- 靜態跨平台 HTML5 音訊播放節點 (突破 iOS 跨域與手勢鏈限制) -->
-<audio id="global-audio-element" playsinline webkit-playsinline preload="auto"></audio>
-
 <div class="app-viewport">
     <div class="app-header">
         <h1 class="app-title">Super Fun 1 單字學習方程式</h1>
@@ -532,6 +529,9 @@
     let wrongWords = [];
     let speakingScoreLogs = [];
 
+    // === Web Audio API + HTML5 Audio 雙重防爆引擎 ===
+    let audioCtx = null;
+    const audioBufferMap = new Map();
     const imageCache = new Map();
 
     const isNativePlatform = () => {
@@ -551,6 +551,41 @@
         imgElement.src = src || FALLBACK_IMAGE;
     }
 
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+                audioCtx = new AudioContextClass();
+            }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        return audioCtx;
+    }
+
+    // 預載 MP3 並透過 fetch + decode 解碼至 Web Audio Buffer
+    async function preloadAudioBuffers(wordList) {
+        if (!Array.isArray(wordList)) return;
+        const ctx = getAudioContext();
+        if (!ctx) return;
+
+        wordList.forEach(async (item) => {
+            if (item && item.audio && !audioBufferMap.has(item.audio)) {
+                try {
+                    const response = await fetch(item.audio);
+                    if (response.ok) {
+                        const arrayBuffer = await response.arrayBuffer();
+                        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                        audioBufferMap.set(item.audio, audioBuffer);
+                    }
+                } catch (e) {
+                    console.warn(`Web Audio 解碼不支援（例如靜態 Local File），改使用 HTML5 節點: ${item.audio}`);
+                }
+            }
+        });
+    }
+
     function preloadAssets(wordList) {
         if (!Array.isArray(wordList)) return;
         wordList.forEach(item => {
@@ -561,33 +596,32 @@
                 imageCache.set(item.image, img);
             }
         });
+        preloadAudioBuffers(wordList);
     }
 
-    // === 💯 全新手勢鏈解鎖 + HTML5 Audio 直接播音引擎 ===
     let audioUnlocked = false;
-
     function unlockAudio() {
         if (audioUnlocked) return;
-        const audioEl = document.getElementById('global-audio-element');
-        if (audioEl) {
-            audioEl.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
-            const p = audioEl.play();
-            if (p !== undefined) {
-                p.then(() => {
-                    audioEl.pause();
-                    audioUnlocked = true;
-                }).catch(() => {});
+        try {
+            const ctx = getAudioContext();
+            if (ctx) {
+                const buffer = ctx.createBuffer(1, 1, 22050);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                source.start(0);
             }
-        }
-
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            audioUnlocked = true;
+        } catch(e) {
+            console.warn("Audio unlock warning:", e);
         }
 
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('click', unlockAudio);
     }
-
     document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
     document.addEventListener('click', unlockAudio, { once: true, passive: true });
 
@@ -662,32 +696,38 @@
         }
     }
 
-    // === 直連 MP3 音訊播放 (不走 fetch，100% 解決跨域與讀不到檔問題) ===
+    // === 核心：無敵多重降級 iPhone 15 音訊播放器 ===
     function playAudio(item) {
         if (!item) return;
         unlockAudio();
 
-        const audioEl = document.getElementById('global-audio-element');
-
-        if (item.audio && audioEl) {
+        // 1. 優先嘗試 Web Audio API 解碼 Buffer（可突破 iOS 靜音切換開關）
+        const ctx = getAudioContext();
+        if (item.audio && audioBufferMap.has(item.audio) && ctx) {
             try {
-                audioEl.pause();
-                audioEl.currentTime = 0;
+                const buffer = audioBufferMap.get(item.audio);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                source.start(0);
+                return;
+            } catch (e) {
+                console.warn("Web Audio Buffer 播放失敗，降級至 HTML5 Audio:", e);
+            }
+        }
 
-                // 綁定錯誤回呼：若 MP3 檔案不存在（404），自動切換至 SpeechSynthesis 備援
-                audioEl.onerror = () => {
-                    console.warn(`音檔讀取失敗: ${item.audio}，自動切換至 TTS 備援`);
+        // 2. 次要嘗試同步 HTML5 Audio 實例播放（相容實體檔與本地路徑）
+        if (item.audio) {
+            try {
+                const audioObj = new Audio(item.audio);
+                audioObj.onerror = () => {
+                    console.warn(`音檔讀取失敗: ${item.audio}，切換至 TTS 備援`);
                     speakText(item.word);
                 };
-
-                audioEl.src = item.audio;
-                const playPromise = audioEl.play();
-
-                if (playPromise !== undefined) {
-                    playPromise.catch((e) => {
-                        // 忽略使用者連續點擊所產生的 AbortError
+                const p = audioObj.play();
+                if (p !== undefined) {
+                    p.catch(e => {
                         if (e && e.name !== 'AbortError') {
-                            console.warn("HTML5 Audio 播放失敗，降級至 TTS:", e);
                             speakText(item.word);
                         }
                     });
@@ -784,10 +824,11 @@
         if (quizView) quizView.style.display = 'flex';
         if (resultView) resultView.style.display = 'none';
         
-        loadListeningQuestion();
+        loadListeningQuestion(false); // 第一次進入時不自動播，避免 iOS 自播阻擋
     }
 
-    function loadListeningQuestion() {
+    // 修正：增加 isUserTriggered 標籤，防止 setTimeout 自動播音被 iOS 判定非法
+    function loadListeningQuestion(isUserTriggered = false) {
         if (!currentQuizList || quizIndex >= currentQuizList.length) {
             showListeningResult();
             return;
@@ -837,7 +878,8 @@
             });
         }
 
-        if (audioUnlocked) {
+        // 只有在使用者手動觸發時或已完全解鎖 AudioContext 時才嘗試播音
+        if (isUserTriggered || audioUnlocked) {
             playQuizAudio();
         }
     }
@@ -860,7 +902,7 @@
             }
             setTimeout(() => {
                 quizIndex++;
-                loadListeningQuestion();
+                loadListeningQuestion(false);
             }, 800);
         } else {
             if (!wrongWords.some(w => w.word === correct.word)) {
@@ -875,7 +917,7 @@
             }
             setTimeout(() => {
                 quizIndex++;
-                loadListeningQuestion();
+                loadListeningQuestion(false);
             }, 1800);
         }
     }
@@ -1063,11 +1105,6 @@
     }
 
     async function startSpeechRecognition() {
-        // 啟動錄音前關閉播放器與 TTS 語音
-        const audioEl = document.getElementById('global-audio-element');
-        if (audioEl) {
-            try { audioEl.pause(); } catch(e) {}
-        }
         if ('speechSynthesis' in window) {
             try { window.speechSynthesis.cancel(); } catch (e) {}
         }

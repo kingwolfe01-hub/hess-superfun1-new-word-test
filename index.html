@@ -540,6 +540,11 @@
         }
     };
 
+    const isIOSDevice = () => {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    };
+
     function safeSetImageSource(imgElement, src) {
         if (!imgElement) return;
         imgElement.onerror = function() {
@@ -659,8 +664,16 @@
     }
 
     async function playAudio(item) {
-        unlockAudio();
         if (!item) return;
+
+        // iPhone / iPad Safari 對 HTMLAudioElement 與非同步 fallback 很嚴格。
+        // 只要是 iOS Web 模式，就直接在使用者點擊事件中用 SpeechSynthesis 播放，避免 MP3 載入或播放權限失敗造成無聲。
+        if (!isNativePlatform() && isIOSDevice()) {
+            speakText(item.word);
+            return;
+        }
+
+        unlockAudio();
 
         if (item.audio) {
             try {
@@ -690,12 +703,17 @@
         if ('speechSynthesis' in window) {
             try {
                 window.speechSynthesis.cancel();
-                setTimeout(() => {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'en-US';
-                    utterance.rate = 0.85;
-                    window.speechSynthesis.speak(utterance);
-                }, 50);
+
+                // iOS Safari 需要在使用者點擊的同步呼叫鏈中直接 speak，避免 setTimeout 造成靜默失敗。
+                const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.85;
+
+                const enVoice = voices.find(v => v.lang === 'en-US') || voices.find(v => /^en[-_]/i.test(v.lang));
+                if (enVoice) utterance.voice = enVoice;
+
+                window.speechSynthesis.speak(utterance);
             } catch(e) {
                 console.warn("SpeechSynthesis error:", e);
             }

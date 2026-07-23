@@ -666,6 +666,9 @@
             try {
                 globalAudioPlayer.pause();
                 globalAudioPlayer.currentTime = 0;
+                globalAudioPlayer.onerror = () => {
+                    speakText(item.word);
+                };
                 globalAudioPlayer.src = item.audio;
                 
                 const playPromise = globalAudioPlayer.play();
@@ -959,6 +962,39 @@
         }
     }
 
+    async function ensureNativeSpeechPermission() {
+        if (!NativeSpeech) return false;
+        try {
+            if (NativeSpeech.checkPermissions && NativeSpeech.requestPermissions) {
+                let status = await NativeSpeech.checkPermissions();
+                const speechOk = !status || !status.speechRecognition || status.speechRecognition === 'granted';
+                const micOk = !status || !status.microphone || status.microphone === 'granted';
+
+                if (!speechOk || !micOk) {
+                    status = await NativeSpeech.requestPermissions();
+                }
+
+                const speechGranted = !status || !status.speechRecognition || status.speechRecognition === 'granted';
+                const micGranted = !status || !status.microphone || status.microphone === 'granted';
+                return speechGranted && micGranted;
+            }
+
+            if (NativeSpeech.hasPermission && NativeSpeech.requestPermission) {
+                let oldStatus = await NativeSpeech.hasPermission();
+                if (oldStatus && oldStatus.permission) return true;
+
+                await NativeSpeech.requestPermission();
+                oldStatus = await NativeSpeech.hasPermission();
+                return !!(oldStatus && oldStatus.permission);
+            }
+
+            return true;
+        } catch (e) {
+            console.warn("Native speech permission check failed:", e);
+            return false;
+        }
+    }
+
     function onSpeechStartUI() {
         isRecognizing = true;
         const micBtn = document.getElementById('mic-btn');
@@ -973,12 +1009,13 @@
         if (feedback) feedback.innerHTML = "";
 
         clearTimeout(recognitionTimeout);
+        // 針對 iOS Safari 延長至 8 秒超時緩衝
         recognitionTimeout = setTimeout(() => {
             if (isRecognizing && !hasProcessedQuestion) {
                 stopRecognition();
                 processSpeakingResult("", 0);
             }
-        }, 5000);
+        }, 8000);
     }
 
     function handleSpokenText(spoken, isFinal = false) {
@@ -1003,8 +1040,18 @@
         }
     }
 
+    // === iOS Safari & iPhone 15 專屬優化語音啟動 ===
     async function startSpeechRecognition() {
-        unlockAudio();
+        // 強制暫停所有播音，釋放 iOS 麥克風音訊通道 (AVAudioSession)
+        if (globalAudioPlayer) {
+            try {
+                globalAudioPlayer.pause();
+                globalAudioPlayer.currentTime = 0;
+            } catch (e) {}
+        }
+        if ('speechSynthesis' in window) {
+            try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
 
         if (isRecognizing) {
             stopRecognition();
@@ -1015,9 +1062,11 @@
 
         if (isNativePlatform() && NativeSpeech) {
             try {
-                const hasPermission = await NativeSpeech.hasPermission();
-                if (!hasPermission || !hasPermission.permission) {
-                    await NativeSpeech.requestPermission();
+                const permissionGranted = await ensureNativeSpeechPermission();
+                if (!permissionGranted) {
+                    alert("請開啟麥克風與語音辨識權限後再試一次。");
+                    stopRecognition();
+                    return;
                 }
                 
                 if (nativePluginListener) {
@@ -1044,34 +1093,45 @@
                 stopRecognition();
                 alert("語音辨識啟動失敗，請確認麥克風權限已開啟。");
             }
-        } else if (webSpeechInstance) {
-            if (!isRecognizing) {
-                try {
-                    webSpeechInstance.onstart = () => onSpeechStartUI();
-                    webSpeechInstance.onresult = (event) => {
-                        if (!event || !event.results || !event.results[0] || hasProcessedQuestion) return;
-                        const spoken = event.results[0][0].transcript;
-                        const isFinal = !!event.results[0].isFinal;
-                        handleSpokenText(spoken, isFinal);
-                    };
-                    webSpeechInstance.onerror = (e) => {
-                        console.warn("WebSpeech engine error:", e);
-                        stopRecognition();
-                    };
-                    webSpeechInstance.onend = () => stopRecognition();
-
-                    webSpeechInstance.start();
-                } catch (e) {
-                    console.error("WebSpeech Exception:", e);
-                    stopRecognition();
-                }
-            }
         } else {
-            alert("您的裝置或瀏覽器暫不支援語音辨識功能。");
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("您的裝置或瀏覽器暫不支援語音辨識功能。");
+                return;
+            }
+
+            try {
+                // 每次建立全新實例，徹底解決 iOS Safari 重用物件時無音訊串流的 WebKit Bug
+                webSpeechInstance = new SpeechRecognition();
+                webSpeechInstance.lang = 'en-US';
+                webSpeechInstance.continuous = false;
+                webSpeechInstance.interimResults = true;
+
+                webSpeechInstance.onstart = () => onSpeechStartUI();
+
+                webSpeechInstance.onresult = (event) => {
+                    if (!event || !event.results || !event.results[0] || hasProcessedQuestion) return;
+                    const spoken = event.results[0][0].transcript;
+                    const isFinal = !!event.results[0].isFinal;
+                    handleSpokenText(spoken, isFinal);
+                };
+
+                webSpeechInstance.onerror = (e) => {
+                    console.warn("WebSpeech engine error:", e);
+                    stopRecognition();
+                };
+
+                webSpeechInstance.onend = () => resetSpeechUI();
+
+                webSpeechInstance.start();
+            } catch (e) {
+                console.error("WebSpeech Exception:", e);
+                stopRecognition();
+            }
         }
     }
 
-    function stopRecognition() {
+    function resetSpeechUI() {
         isRecognizing = false;
         clearTimeout(recognitionTimeout);
 
@@ -1083,6 +1143,10 @@
             micBtn.style.background = "linear-gradient(135deg, #10b981 0%, #059669 100%)";
         }
         if (waveBox) waveBox.classList.remove('active');
+    }
+
+    function stopRecognition() {
+        resetSpeechUI();
         
         if (isNativePlatform() && NativeSpeech) {
             try { 
